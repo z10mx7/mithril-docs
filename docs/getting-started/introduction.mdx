@@ -5,13 +5,13 @@ description: "Welcome to Mithril - A batteries-included web framework for Go"
 
 # Welcome to Mithril
 
-Mithril is a batteries-included web framework built on Fiber v2 with Laravel/Django-inspired features. It brings the developer experience of modern frameworks to the Go ecosystem, providing everything you need to build production-ready web applications.
+Mithril is a batteries-included web framework built on top of Fiber v2 with features that inspired from famus frameworks like FastAPI, Django, Express, Nest and Laravel. It brings the developer experience of modern frameworks to the Go ecosystem, providing everything you need to build production-ready web applications.
 
 ## Why Mithril?
 
 ### 🚀 **Developer Experience**
-- **Artisan-like CLI**: Global CLI tool (`mithril new project`) + local artisan commands
-- **Code Generation**: Generate controllers, models, migrations, and more with simple commands
+- **Amazing CLI**: Global CLI tool (`mithril new project`) + local commands , consider it something similar to django-admin or django manage.py or laravels artisan
+- **Code Generation**: Generate controllers, models, migrations, CRUD and more with simple commands
 - **Hot Reload**: Live reload during development with Air integration
 - **Comprehensive Testing**: Built-in testing utilities and helpers
 
@@ -22,33 +22,36 @@ Mithril is a batteries-included web framework built on Fiber v2 with Laravel/Dja
 - **Middleware Stack**: CORS, CSRF, rate limiting, sessions, and more
 
 ### 🔐 **Security First**
+- **Encryption**: AES Encryption and MistHash support
 - **JWT Authentication**: Access and refresh token management
-- **RBAC System**: Role-based access control with permissions
+- **RBAC System**: Django Like Role-based access control with permissions
 - **CSRF Protection**: Built-in CSRF token validation
 - **Rate Limiting**: Per-IP, per-user, and per-route rate limiting
 - **Security Headers**: Helmet-style security headers
+- **RequestID**: every request has its own unique ID to detect attacker easier
 
 ### 📊 **Production Ready**
 - **Health Checks**: Built-in health check endpoints
-- **Monitoring**: Prometheus metrics and OpenTelemetry support
+- **Monitoring**: Prometheus metrics and OpenTelemetry and Sentry support
 - **Logging**: Structured JSON logging with multiple levels
 - **Docker Support**: Multi-stage Dockerfile and docker-compose configurations
 - **Kubernetes**: Complete K8s deployment manifests
+- **Github Actions**: Complete Github Actions for CI/CD and Deployment Notifications
 
 ## Key Features
 
 ### Core Framework
 - **Configuration Management**: Environment-based config with validation
 - **Request/Response Validation**: FastAPI-style schema validation
-- **Auto-generated Swagger**: OpenAPI 3.0 documentation at `/docs`
+- **Auto-generated Swagger**: OpenAPI 3.0 documentation at `/docs` , Like FastAPI
 - **Module System**: Django-style app organization
 - **Template Engine**: HTML templates with Go's `html/template`
 
 ### Database & Migrations
-- **Multi-database Support**: PostgreSQL, MySQL, SQLite, MongoDB
-- **Laravel-style Migrations**: Up/Down methods with rollback support
+- **Multi-database Support**: PostgreSQL, Clickhouse, MongoDB, Oracle, MySQL, SQL Server, SQLite, 
+- **Migrations**: Up/Down methods with rollback support, Like Django and Laravel
 - **Database Seeding**: Populate databases with test data
-- **Backup & Restore**: Full database backup and restore functionality
+- **Backup & Restore**: Full database backup and restore functionality, like Django but more advanced 
 - **UUID Primary Keys**: Secure, globally unique identifiers by default
 
 ### Authentication & Authorization
@@ -58,17 +61,18 @@ Mithril is a batteries-included web framework built on Fiber v2 with Laravel/Dja
 - **Email Verification**: Built-in email verification system
 - **Password Reset**: Secure password reset flow
 - **RBAC**: Role-based access control with roles and permissions
+- **RequestID**: every request has its own unique ID to make easier Debugging user issues even in Production
+
+
 
 ### File Storage
-- **S3 Integration**: AWS S3 support with SDK v2
-- **MinIO Support**: S3-compatible storage
-- **Local Storage**: File system storage for development
-- **File Operations**: Upload, download, stream, list, and delete files
+- **Object Storage**: AWS S3 Integration and MinIO Support, no more Local Storage at all
+- **File Operations**: Upload, download, stream, list, and delete files and folders using builtin Filemanagement API
 - **Backup/Restore**: Storage backup and restore functionality
 
 ### Background Jobs
-- **Queue System**: Memory, Redis, RabbitMQ, and Kafka support
-- **Task Scheduling**: Cron-like scheduling with recurring tasks
+- **Queue System**: RabbitMQ, Kafka, Memory and Redis support
+- **Task Scheduling**: Cron-like scheduling with recurring tasks with monitoring tools for queue
 - **Job Retries**: Automatic retry with exponential backoff
 - **Failed Job Handling**: Dead letter queue and retry mechanisms
 
@@ -79,16 +83,16 @@ Mithril is a batteries-included web framework built on Fiber v2 with Laravel/Dja
 
 ### Monitoring & Observability
 - **Health Checks**: `/health`, `/livez`, `/readyz` endpoints
-- **Prometheus Metrics**: `/metrics` endpoint for monitoring
+- **Prometheus Metrics**: `/pmetrics` endpoint for monitoring
 - **OpenTelemetry**: Distributed tracing support
 - **Sentry Integration**: Error tracking and monitoring
-- **System Monitoring**: CPU, memory, disk, and network monitoring
+- **System Monitoring**:  `/metrics` endpoint for CPU, memory, disk, and network monitoring
 
 ## Quick Comparison
 
 | Feature | Mithril | Gin | Echo | Fiber |
 |---------|---------|-----|------|-------|
-| **Performance** | ⚡ High | ⚡ High | ⚡ High | ⚡ Very High |
+| **Performance** | ⚡ Very High  | ⚡ High | ⚡ High | ⚡ Very High |
 | **CLI Tools** | ✅ Built-in | ❌ None | ❌ None | ❌ None |
 | **Code Generation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
 | **Migrations** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
@@ -106,6 +110,7 @@ Ready to get started? Here's what you can do next:
 3. **[Core Concepts](/docs/core/application)** - Learn about the core framework concepts
 4. **[CLI Commands](/docs/cli/overview)** - Explore the powerful CLI tools
 5. **[Examples](/docs/examples/basic-api)** - See Mithril in action
+5. **[Examples](/docs/examples/basic-api)** - See Mithril Video Courses
 
 ## Community & Support
 
