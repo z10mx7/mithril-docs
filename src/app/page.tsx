@@ -52,10 +52,10 @@ export default function Home() {
                 className="h-auto w-auto dark:invert"
                 width={100}
                 height={100}
-                src={`/logos/pinedocs.png`}
+                src={`/logo.png`}
               />
               <h1 className="text-5xl content-center md:text-7xl font-stretch-110% -tracking-tighter text-gray-900 dark:text-white">
-                PINE<span className="md:text-8xl">X</span>IO
+              Mithril
               </h1>
             </motion.div>
             <motion.p
@@ -144,7 +144,7 @@ export default function Home() {
       <footer className="sticky bottom-0 z-10 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
         <div className="container mx-auto px-4 py-3 text-center text-gray-600 dark:text-gray-400">
           <div className="flex justify-end items-center space-x-4">
-            <Button
+            {/* <Button
               className="px-4 py-2 text-sm font-medium gap-2"
               onClick={() =>
                 window.open(
@@ -161,10 +161,10 @@ export default function Home() {
                 className={'dark:invert'}
               />
               <span>Deploy to Vercel</span>
-            </Button>
+            </Button> */}
             <div className="flex text-sm text-right gap-3">
               <p>
-                Built with ❤️ by <strong>Sanjay Rajeev</strong>
+                Built with ❤️ by <strong>z10mx7</strong>
               </p>
             </div>
           </div>

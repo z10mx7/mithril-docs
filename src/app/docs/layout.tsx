@@ -56,14 +56,14 @@ export default function DocsLayout({
                   className={'h-auto w-aut dark:invert'}
                   width={100}
                   height={100}
-                  src={`/logos/pinedocs.png`}
+                  src={`/logo.png`}
                 />
               }
             />
 
             <Link href={'/'} className="flex flex-1 gap-3">
               <SidebarHeaderTitle>
-                PINE<span className="text-4xl">X</span>IO
+              Mithril
               </SidebarHeaderTitle>
             </Link>
           </SidebarHeader>
@@ -86,12 +86,12 @@ export default function DocsLayout({
             ))}
           </SidebarContent>
 
-          <SidebarFooter>
+          {/* <SidebarFooter>
             <UserAvatar>
               {
                 <Image
                   alt="logo"
-                  src={'https://avatars.githubusercontent.com/u/24631970?v=4'}
+                  src={'https://avatars.githubusercontent.com/u/3?v=4'}
                   width={100}
                   height={100}
                 />
@@ -99,13 +99,13 @@ export default function DocsLayout({
             </UserAvatar>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Sanjay Rajeev
+                z10mx7
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                sanjayc208@gmail.com
+                z10mx7@gmail.com
               </span>
             </div>
-          </SidebarFooter>
+          </SidebarFooter> */}
         </Sidebar>
 
         {/* Main Content */}
@@ -120,7 +120,7 @@ export default function DocsLayout({
               <ModeToggle />
               <Button
                 onClick={() =>
-                  router.push('https://github.com/sanjayc208/pinedocs')
+                  router.push('https://github.com/mithril-framework/mithril')
                 }
               >
                 <Github className="h-[1.2rem] w-[1.2rem] transition-all" />
