@@ -1,0 +1,417 @@
+---
+title: "Quick Start"
+description: "Create your first Mithril application in minutes"
+---
+
+# Quick Start
+
+Get up and running with Mithril in just a few minutes! This guide will walk you through creating your first Mithril application.
+
+## Create Your First Project
+
+### 1. Install Mithril
+
+```bash
+# Install the global CLI tool
+go install github.com/mithril-framework/mithril/cmd/mithril@latest
+```
+
+### 2. Create a New Project
+
+```bash
+# Create a new Mithril project
+mithril new hello-mithril
+
+# Navigate to the project directory
+cd hello-mithril
+```
+
+### 3. Install Dependencies
+
+```bash
+# Install Go dependencies
+go mod tidy
+```
+
+### 4. Configure Environment
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# The default configuration will work for this quick start
+```
+
+### 5. Start the Development Server
+
+```bash
+# Start the development server
+go run . artisan serve
+```
+
+### 6. Visit Your Application
+
+Open your browser and visit:
+- **Web Application**: http://localhost:3000
+- **API Documentation**: http://localhost:3000/docs
+- **Health Check**: http://localhost:3000/health
+
+🎉 **Congratulations!** You've created your first Mithril application!
+
+## Understanding the Project Structure
+
+Let's explore what Mithril created for you:
+
+```
+hello-mithril/
+├── app/
+│   ├── controllers/          # HTTP controllers
+│   ├── middleware/           # Custom middleware
+│   ├── models/              # Database models
+│   ├── schemas/             # Request/response validation
+│   └── modules/             # Django-style modules
+├── config/                  # Configuration files
+├── database/
+│   ├── migrations/          # Database migrations
+│   └── seeders/            # Database seeders
+├── routes/
+│   ├── api.go              # API routes
+│   ├── web.go              # Web routes
+│   └── console.go          # Console commands
+├── templates/              # HTML templates
+├── utils/                  # Utility functions
+├── artisan                 # Local CLI script
+├── main.go                 # Application entry point
+├── Makefile               # Build commands
+├── Dockerfile             # Docker configuration
+└── docker-compose.*.yml   # Docker Compose files
+```
+
+## Your First API Endpoint
+
+Let's create a simple API endpoint to get familiar with Mithril:
+
+### 1. Create a Controller
+
+```bash
+# Generate a new controller
+go run . artisan make:controller HelloController
+```
+
+This creates `app/controllers/hello_controller.go`:
+
+```go
+package controllers
+
+import (
+    "github.com/gofiber/fiber/v2"
+)
+
+type HelloController struct{}
+
+func NewHelloController() *HelloController {
+    return &HelloController{}
+}
+
+func (c *HelloController) Index(ctx *fiber.Ctx) error {
+    return ctx.JSON(fiber.Map{
+        "message": "Hello from Mithril!",
+        "version": "1.0.0-alpha",
+        "timestamp": time.Now().Unix(),
+    })
+}
+```
+
+### 2. Create a Route
+
+Edit `routes/api.go`:
+
+```go
+package routes
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "hello-mithril/app/controllers"
+)
+
+func SetupAPIRoutes(app *fiber.App) {
+    api := app.Group("/api")
+    
+    helloController := controllers.NewHelloController()
+    
+    api.Get("/hello", helloController.Index)
+}
+```
+
+### 3. Test Your Endpoint
+
+```bash
+# Test the endpoint
+curl http://localhost:3000/api/hello
+```
+
+You should see:
+
+```json
+{
+    "message": "Hello from Mithril!",
+    "version": "1.0.0-alpha",
+    "timestamp": 1704067200
+}
+```
+
+## Your First Database Model
+
+Let's create a simple User model and see Mithril's database features:
+
+### 1. Create a Model
+
+```bash
+# Generate a new model
+go run . artisan make:model User
+```
+
+This creates `app/models/user.go`:
+
+```go
+package models
+
+import (
+    "time"
+    "github.com/google/uuid"
+    "gorm.io/gorm"
+)
+
+type User struct {
+    ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+    Email     string    `json:"email" gorm:"uniqueIndex;not null"`
+    Name      string    `json:"name" gorm:"not null"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
+```
+
+### 2. Create a Migration
+
+```bash
+# Generate a migration
+go run . artisan make:migration create_users_table
+```
+
+This creates a migration file in `database/migrations/`:
+
+```go
+package migrations
+
+import (
+    "gorm.io/gorm"
+    "hello-mithril/app/models"
+)
+
+type CreateUsersTable struct{}
+
+func (m *CreateUsersTable) Up(db *gorm.DB) error {
+    return db.AutoMigrate(&models.User{})
+}
+
+func (m *CreateUsersTable) Down(db *gorm.DB) error {
+    return db.Migrator().DropTable(&models.User{})
+}
+```
+
+### 3. Run the Migration
+
+```bash
+# Run migrations
+go run . artisan migrate
+```
+
+### 4. Create a Seeder
+
+```bash
+# Generate a seeder
+go run . artisan make:seeder UserSeeder
+```
+
+This creates `database/seeders/user_seeder.go`:
+
+```go
+package seeders
+
+import (
+    "gorm.io/gorm"
+    "hello-mithril/app/models"
+)
+
+type UserSeeder struct{}
+
+func (s *UserSeeder) Run(db *gorm.DB) error {
+    users := []models.User{
+        {Email: "admin@example.com", Name: "Admin User"},
+        {Email: "user@example.com", Name: "Regular User"},
+    }
+    
+    for _, user := range users {
+        db.Create(&user)
+    }
+    
+    return nil
+}
+```
+
+### 5. Run the Seeder
+
+```bash
+# Run seeders
+go run . artisan db:seed
+```
+
+## Your First Module
+
+Let's create a complete module with CRUD operations:
+
+### 1. Create a Module
+
+```bash
+# Generate a complete module
+go run . artisan make:module blog --full
+```
+
+This creates a complete blog module with:
+- Models (Post, Category)
+- Controllers (PostController, CategoryController)
+- Routes (API and web routes)
+- Schemas (Request/response validation)
+- Views (HTML templates)
+
+### 2. Run Migrations
+
+```bash
+# Run migrations for the new module
+go run . artisan migrate
+```
+
+### 3. Test the Module
+
+```bash
+# Test the blog API
+curl http://localhost:3000/api/posts
+curl http://localhost:3000/api/categories
+```
+
+## Authentication Setup
+
+Let's add authentication to your application:
+
+### 1. Scaffold Authentication
+
+```bash
+# Generate authentication system
+go run . artisan make:auth
+```
+
+This creates:
+- Authentication controllers
+- JWT token management
+- Login/register routes
+- Password reset functionality
+- Email verification
+
+### 2. Create a Superuser
+
+```bash
+# Create an admin user
+go run . artisan createsuperuser
+```
+
+### 3. Test Authentication
+
+```bash
+# Register a new user
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123","name":"Test User"}'
+
+# Login
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+```
+
+## Explore the CLI
+
+Mithril comes with a powerful CLI. Let's explore some commands:
+
+```bash
+# List all available commands
+go run . artisan list
+
+# Show help for a specific command
+go run . artisan help make:controller
+
+# Generate various components
+go run . artisan make:controller ProductController
+go run . artisan make:model Product
+go run . artisan make:middleware AuthMiddleware
+go run . artisan make:request CreateProductRequest
+
+# Database operations
+go run . artisan migrate:status
+go run . artisan migrate:rollback
+go run . artisan db:backup
+
+# Queue operations
+go run . artisan queue:work
+go run . artisan queue:failed
+
+# Monitoring
+go run . artisan monitor:health
+go run . artisan monitor:metrics
+```
+
+## What's Next?
+
+Now that you have a basic Mithril application running, here's what you can explore next:
+
+### 1. **Core Concepts**
+- [Application Structure](/docs/core/application)
+- [Configuration Management](/docs/core/configuration)
+- [Dependency Injection](/docs/core/container)
+
+### 2. **Database & Models**
+- [Models and Relationships](/docs/database/models)
+- [Migrations](/docs/database/migrations)
+- [Seeders](/docs/database/seeders)
+
+### 3. **API Development**
+- [Request Validation](/docs/api/validation)
+- [Response Serialization](/docs/api/responses)
+- [Swagger Documentation](/docs/api/swagger)
+
+### 4. **Authentication**
+- [JWT Tokens](/docs/authentication/jwt)
+- [Role-Based Access Control](/docs/authentication/rbac)
+- [2FA Support](/docs/authentication/2fa)
+
+### 5. **Advanced Features**
+- [File Storage](/docs/storage/overview)
+- [Background Jobs](/docs/queue/overview)
+- [WebSocket Support](/docs/core/websocket)
+- [Monitoring](/docs/monitoring/overview)
+
+### 6. **Deployment**
+- [Docker Deployment](/docs/deployment/docker)
+- [Kubernetes](/docs/deployment/kubernetes)
+- [Production Setup](/docs/deployment/production)
+
+## Need Help?
+
+- **Documentation**: Browse the full documentation
+- **GitHub Issues**: Report bugs or request features
+- **Discord Community**: Join our community for help
+- **Examples**: Check out the example projects
+
+---
+
+**Congratulations!** You've successfully created your first Mithril application. The framework is designed to grow with your needs, from simple APIs to complex web applications. Happy coding! 🚀

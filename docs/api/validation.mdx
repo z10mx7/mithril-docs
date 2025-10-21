@@ -1,0 +1,779 @@
+---
+title: "Request/Response Validation"
+description: "FastAPI-style schema validation for requests and responses"
+---
+
+# Request/Response Validation
+
+Mithril provides a powerful request/response validation system inspired by FastAPI. It automatically validates incoming requests and serializes outgoing responses based on schema definitions.
+
+## Schema Definition
+
+### Request Schemas
+
+```go
+// app/schemas/user_request.go
+package schemas
+
+import (
+    "time"
+    "github.com/google/uuid"
+)
+
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+    Password string `json:"password" validate:"required,min=8" example:"password123"`
+    Name     string `json:"name" validate:"required,min=2,max=100" example:"John Doe"`
+    Age      int    `json:"age" validate:"min=18,max=120" example:"25"`
+}
+
+type UpdateUserRequest struct {
+    Name string `json:"name" validate:"omitempty,min=2,max=100" example:"John Doe"`
+    Age  int    `json:"age" validate:"omitempty,min=18,max=120" example:"25"`
+}
+
+type LoginRequest struct {
+    Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+    Password string `json:"password" validate:"required" example:"password123"`
+}
+
+type ChangePasswordRequest struct {
+    CurrentPassword string `json:"current_password" validate:"required" example:"oldpassword123"`
+    NewPassword     string `json:"new_password" validate:"required,min=8" example:"newpassword123"`
+}
+```
+
+### Response Schemas
+
+```go
+// app/schemas/user_response.go
+package schemas
+
+import (
+    "time"
+    "github.com/google/uuid"
+)
+
+type UserResponse struct {
+    ID        uuid.UUID `json:"id" example:"123e4567-e89b-12d3-a456-426614174000"`
+    Email     string    `json:"email" example:"user@example.com"`
+    Name      string    `json:"name" example:"John Doe"`
+    Age       int       `json:"age" example:"25"`
+    CreatedAt time.Time `json:"created_at" example:"2024-01-01T00:00:00Z"`
+    UpdatedAt time.Time `json:"updated_at" example:"2024-01-01T00:00:00Z"`
+}
+
+type UserListResponse struct {
+    Data       []UserResponse `json:"data"`
+    Pagination PaginationMeta `json:"pagination"`
+}
+
+type PaginationMeta struct {
+    CurrentPage int   `json:"current_page" example:"1"`
+    PerPage     int   `json:"per_page" example:"15"`
+    Total       int64 `json:"total" example:"100"`
+    LastPage    int   `json:"last_page" example:"7"`
+    From        int   `json:"from" example:"1"`
+    To          int   `json:"to" example:"15"`
+}
+
+type ErrorResponse struct {
+    Error   string            `json:"error" example:"Validation failed"`
+    Message string            `json:"message" example:"The given data was invalid"`
+    Errors  map[string]string `json:"errors,omitempty" example:"email:['The email field is required']"`
+}
+```
+
+## Validation System
+
+### Core Validator
+
+```go
+// pkg/validation/validator.go
+package validation
+
+import (
+    "fmt"
+    "reflect"
+    "strings"
+    "github.com/go-playground/validator/v10"
+)
+
+type Validator struct {
+    validator *validator.Validate
+}
+
+func NewValidator() *Validator {
+    v := validator.New()
+    
+    // Register custom validators
+    v.RegisterValidation("password", validatePassword)
+    v.RegisterValidation("phone", validatePhone)
+    v.RegisterValidation("slug", validateSlug)
+    
+    // Register custom tag name function
+    v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+        name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+        if name == "-" {
+            return ""
+        }
+        return name
+    })
+    
+    return &Validator{validator: v}
+}
+
+func (v *Validator) ValidateStruct(s interface{}) error {
+    return v.validator.Struct(s)
+}
+
+func (v *Validator) ValidateVar(field interface{}, tag string) error {
+    return v.validator.Var(field, tag)
+}
+
+// Custom validators
+func validatePassword(fl validator.FieldLevel) bool {
+    password := fl.Field().String()
+    if len(password) < 8 {
+        return false
+    }
+    
+    hasUpper := strings.ContainsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    hasLower := strings.ContainsAny(password, "abcdefghijklmnopqrstuvwxyz")
+    hasDigit := strings.ContainsAny(password, "0123456789")
+    hasSpecial := strings.ContainsAny(password, "!@#$%^&*()_+-=[]{}|;:,.<>?")
+    
+    return hasUpper && hasLower && hasDigit && hasSpecial
+}
+
+func validatePhone(fl validator.FieldLevel) bool {
+    phone := fl.Field().String()
+    // Simple phone validation - can be enhanced
+    return len(phone) >= 10 && len(phone) <= 15
+}
+
+func validateSlug(fl validator.FieldLevel) bool {
+    slug := fl.Field().String()
+    if slug == "" {
+        return true // Allow empty for optional fields
+    }
+    
+    // Check if slug contains only lowercase letters, numbers, and hyphens
+    for _, char := range slug {
+        if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+            return false
+        }
+    }
+    
+    return true
+}
+```
+
+### Validation Middleware
+
+```go
+// pkg/validation/middleware.go
+package validation
+
+import (
+    "encoding/json"
+    "github.com/gofiber/fiber/v2"
+    "reflect"
+)
+
+func ValidateRequest[T any](validator *Validator) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        var req T
+        
+        // Parse JSON body
+        if err := c.BodyParser(&req); err != nil {
+            return c.Status(400).JSON(fiber.Map{
+                "error":   "Invalid JSON",
+                "message": err.Error(),
+            })
+        }
+        
+        // Validate struct
+        if err := validator.ValidateStruct(&req); err != nil {
+            return c.Status(422).JSON(fiber.Map{
+                "error":   "Validation failed",
+                "message": "The given data was invalid",
+                "errors":  formatValidationErrors(err),
+            })
+        }
+        
+        // Store validated data in context
+        c.Locals("validated_data", &req)
+        
+        return c.Next()
+    }
+}
+
+func formatValidationErrors(err error) map[string][]string {
+    errors := make(map[string][]string)
+    
+    if validationErrors, ok := err.(validator.ValidationErrors); ok {
+        for _, e := range validationErrors {
+            field := e.Field()
+            tag := e.Tag()
+            
+            var message string
+            switch tag {
+            case "required":
+                message = "The " + field + " field is required"
+            case "email":
+                message = "The " + field + " field must be a valid email address"
+            case "min":
+                message = "The " + field + " field must be at least " + e.Param() + " characters"
+            case "max":
+                message = "The " + field + " field must not exceed " + e.Param() + " characters"
+            case "password":
+                message = "The " + field + " field must contain at least one uppercase letter, one lowercase letter, one digit, and one special character"
+            case "phone":
+                message = "The " + field + " field must be a valid phone number"
+            case "slug":
+                message = "The " + field + " field must contain only lowercase letters, numbers, and hyphens"
+            default:
+                message = "The " + field + " field is invalid"
+            }
+            
+            errors[field] = append(errors[field], message)
+        }
+    }
+    
+    return errors
+}
+```
+
+## Controller Integration
+
+### Using Validation in Controllers
+
+```go
+// app/controllers/user_controller.go
+package controllers
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/app/schemas"
+    "my-app/pkg/validation"
+)
+
+type UserController struct {
+    userService *services.UserService
+    validator   *validation.Validator
+}
+
+func NewUserController(userService *services.UserService, validator *validation.Validator) *UserController {
+    return &UserController{
+        userService: userService,
+        validator:   validator,
+    }
+}
+
+func (c *UserController) Create(ctx *fiber.Ctx) error {
+    // Get validated data from context
+    req := ctx.Locals("validated_data").(*schemas.CreateUserRequest)
+    
+    // Create user
+    user, err := c.userService.Create(*req)
+    if err != nil {
+        return ctx.Status(400).JSON(fiber.Map{
+            "error":   "Failed to create user",
+            "message": err.Error(),
+        })
+    }
+    
+    // Return response
+    return ctx.Status(201).JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+
+func (c *UserController) Update(ctx *fiber.Ctx) error {
+    id := ctx.Params("id")
+    req := ctx.Locals("validated_data").(*schemas.UpdateUserRequest)
+    
+    user, err := c.userService.Update(id, *req)
+    if err != nil {
+        return ctx.Status(400).JSON(fiber.Map{
+            "error":   "Failed to update user",
+            "message": err.Error(),
+        })
+    }
+    
+    return ctx.JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+```
+
+### Route Setup with Validation
+
+```go
+// routes/api.go
+package routes
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/app/controllers"
+    "my-app/app/schemas"
+    "my-app/pkg/validation"
+)
+
+func SetupAPIRoutes(app *fiber.App) {
+    api := app.Group("/api")
+    
+    validator := validation.NewValidator()
+    userController := controllers.NewUserController(userService, validator)
+    
+    // Users routes with validation
+    api.Post("/users", 
+        validation.ValidateRequest[schemas.CreateUserRequest](validator),
+        userController.Create,
+    )
+    
+    api.Put("/users/:id",
+        validation.ValidateRequest[schemas.UpdateUserRequest](validator),
+        userController.Update,
+    )
+    
+    api.Post("/auth/login",
+        validation.ValidateRequest[schemas.LoginRequest](validator),
+        authController.Login,
+    )
+    
+    api.Post("/auth/change-password",
+        middleware.Auth(),
+        validation.ValidateRequest[schemas.ChangePasswordRequest](validator),
+        authController.ChangePassword,
+    )
+}
+```
+
+## Response Serialization
+
+### Automatic Response Serialization
+
+```go
+// pkg/validation/response.go
+package validation
+
+import (
+    "encoding/json"
+    "github.com/gofiber/fiber/v2"
+    "reflect"
+)
+
+func SerializeResponse[T any](data T) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        return c.JSON(data)
+    }
+}
+
+func SerializePaginatedResponse[T any](data []T, pagination schemas.PaginationMeta) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        return c.JSON(fiber.Map{
+            "data":       data,
+            "pagination": pagination,
+        })
+    }
+}
+```
+
+### Custom Response Serialization
+
+```go
+// app/controllers/user_controller.go
+func (c *UserController) Index(ctx *fiber.Ctx) error {
+    page := ctx.QueryInt("page", 1)
+    perPage := ctx.QueryInt("per_page", 15)
+    
+    users, total, err := c.userService.GetPaginated(page, perPage)
+    if err != nil {
+        return ctx.Status(500).JSON(fiber.Map{
+            "error": "Failed to fetch users",
+        })
+    }
+    
+    // Convert to response schemas
+    var userResponses []schemas.UserResponse
+    for _, user := range users {
+        userResponses = append(userResponses, schemas.UserResponse{
+            ID:        user.ID,
+            Email:     user.Email,
+            Name:      user.Name,
+            Age:       user.Age,
+            CreatedAt: user.CreatedAt,
+            UpdatedAt: user.UpdatedAt,
+        })
+    }
+    
+    // Calculate pagination
+    lastPage := int((total + int64(perPage) - 1) / int64(perPage))
+    pagination := schemas.PaginationMeta{
+        CurrentPage: page,
+        PerPage:     perPage,
+        Total:       total,
+        LastPage:    lastPage,
+        From:        (page-1)*perPage + 1,
+        To:          page * perPage,
+    }
+    
+    return ctx.JSON(schemas.UserListResponse{
+        Data:       userResponses,
+        Pagination: pagination,
+    })
+}
+```
+
+## Validation Rules
+
+### Built-in Validation Tags
+
+```go
+type UserRequest struct {
+    // Required fields
+    Email    string `json:"email" validate:"required,email"`
+    Password string `json:"password" validate:"required,min=8"`
+    
+    // String validation
+    Name     string `json:"name" validate:"required,min=2,max=100"`
+    Bio      string `json:"bio" validate:"max=500"`
+    
+    // Numeric validation
+    Age      int    `json:"age" validate:"min=18,max=120"`
+    Score    float64 `json:"score" validate:"min=0,max=100"`
+    
+    // Custom validation
+    Password string `json:"password" validate:"required,password"`
+    Phone    string `json:"phone" validate:"phone"`
+    Slug     string `json:"slug" validate:"slug"`
+    
+    // Conditional validation
+    Website  string `json:"website" validate:"omitempty,url"`
+    Twitter  string `json:"twitter" validate:"omitempty,startswith=@"`
+    
+    // Array validation
+    Tags     []string `json:"tags" validate:"dive,min=1,max=20"`
+    
+    // Nested validation
+    Address  Address `json:"address" validate:"required"`
+}
+
+type Address struct {
+    Street  string `json:"street" validate:"required,min=5,max=100"`
+    City    string `json:"city" validate:"required,min=2,max=50"`
+    Country string `json:"country" validate:"required,len=2"`
+    ZipCode string `json:"zip_code" validate:"required,len=5"`
+}
+```
+
+### Custom Validation Rules
+
+```go
+// pkg/validation/custom_validators.go
+package validation
+
+import (
+    "regexp"
+    "strings"
+    "github.com/go-playground/validator/v10"
+)
+
+func RegisterCustomValidators(v *validator.Validate) {
+    // Username validation
+    v.RegisterValidation("username", func(fl validator.FieldLevel) bool {
+        username := fl.Field().String()
+        if len(username) < 3 || len(username) > 20 {
+            return false
+        }
+        
+        // Only allow alphanumeric and underscore
+        matched, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
+        return matched
+    })
+    
+    // Strong password validation
+    v.RegisterValidation("strong_password", func(fl validator.FieldLevel) bool {
+        password := fl.Field().String()
+        if len(password) < 12 {
+            return false
+        }
+        
+        hasUpper := strings.ContainsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        hasLower := strings.ContainsAny(password, "abcdefghijklmnopqrstuvwxyz")
+        hasDigit := strings.ContainsAny(password, "0123456789")
+        hasSpecial := strings.ContainsAny(password, "!@#$%^&*()_+-=[]{}|;:,.<>?")
+        
+        return hasUpper && hasLower && hasDigit && hasSpecial
+    })
+    
+    // Date validation
+    v.RegisterValidation("date", func(fl validator.FieldLevel) bool {
+        dateStr := fl.Field().String()
+        _, err := time.Parse("2006-01-02", dateStr)
+        return err == nil
+    })
+    
+    // Future date validation
+    v.RegisterValidation("future_date", func(fl validator.FieldLevel) bool {
+        dateStr := fl.Field().String()
+        date, err := time.Parse("2006-01-02", dateStr)
+        if err != nil {
+            return false
+        }
+        return date.After(time.Now())
+    })
+}
+```
+
+## Error Handling
+
+### Validation Error Response
+
+```go
+// pkg/validation/errors.go
+package validation
+
+import (
+    "github.com/go-playground/validator/v10"
+    "github.com/gofiber/fiber/v2"
+)
+
+type ValidationError struct {
+    Field   string `json:"field"`
+    Tag     string `json:"tag"`
+    Value   string `json:"value"`
+    Message string `json:"message"`
+}
+
+func HandleValidationError(err error) error {
+    if validationErrors, ok := err.(validator.ValidationErrors); ok {
+        var errors []ValidationError
+        
+        for _, e := range validationErrors {
+            errors = append(errors, ValidationError{
+                Field:   e.Field(),
+                Tag:     e.Tag(),
+                Value:   fmt.Sprintf("%v", e.Value()),
+                Message: getValidationMessage(e),
+            })
+        }
+        
+        return fiber.NewError(422, "Validation failed", errors)
+    }
+    
+    return err
+}
+
+func getValidationMessage(e validator.FieldError) string {
+    switch e.Tag() {
+    case "required":
+        return "The " + e.Field() + " field is required"
+    case "email":
+        return "The " + e.Field() + " field must be a valid email address"
+    case "min":
+        return "The " + e.Field() + " field must be at least " + e.Param() + " characters"
+    case "max":
+        return "The " + e.Field() + " field must not exceed " + e.Param() + " characters"
+    case "len":
+        return "The " + e.Field() + " field must be exactly " + e.Param() + " characters"
+    case "url":
+        return "The " + e.Field() + " field must be a valid URL"
+    case "username":
+        return "The " + e.Field() + " field must contain only letters, numbers, and underscores"
+    case "strong_password":
+        return "The " + e.Field() + " field must be at least 12 characters with uppercase, lowercase, digit, and special character"
+    default:
+        return "The " + e.Field() + " field is invalid"
+    }
+}
+```
+
+## Testing Validation
+
+### Unit Tests
+
+```go
+// pkg/validation/validator_test.go
+package validation
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestValidator_ValidateStruct(t *testing.T) {
+    validator := NewValidator()
+    
+    tests := []struct {
+        name    string
+        input   interface{}
+        wantErr bool
+    }{
+        {
+            name: "valid user request",
+            input: CreateUserRequest{
+                Email:    "user@example.com",
+                Password: "Password123!",
+                Name:     "John Doe",
+                Age:      25,
+            },
+            wantErr: false,
+        },
+        {
+            name: "invalid email",
+            input: CreateUserRequest{
+                Email:    "invalid-email",
+                Password: "Password123!",
+                Name:     "John Doe",
+                Age:      25,
+            },
+            wantErr: true,
+        },
+        {
+            name: "weak password",
+            input: CreateUserRequest{
+                Email:    "user@example.com",
+                Password: "123",
+                Name:     "John Doe",
+                Age:      25,
+            },
+            wantErr: true,
+        },
+        {
+            name: "missing required field",
+            input: CreateUserRequest{
+                Email:    "user@example.com",
+                Password: "Password123!",
+                Name:     "",
+                Age:      25,
+            },
+            wantErr: true,
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            err := validator.ValidateStruct(tt.input)
+            if tt.wantErr {
+                assert.Error(t, err)
+            } else {
+                assert.NoError(t, err)
+            }
+        })
+    }
+}
+```
+
+### Integration Tests
+
+```go
+// pkg/testing/validation_test.go
+package testing
+
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "github.com/gofiber/fiber/v2"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestValidationMiddleware(t *testing.T) {
+    app := fiber.New()
+    
+    validator := validation.NewValidator()
+    app.Post("/users", 
+        validation.ValidateRequest[schemas.CreateUserRequest](validator),
+        func(c *fiber.Ctx) error {
+            return c.JSON(fiber.Map{"status": "success"})
+        },
+    )
+    
+    tests := []struct {
+        name           string
+        requestBody    interface{}
+        expectedStatus int
+    }{
+        {
+            name: "valid request",
+            requestBody: schemas.CreateUserRequest{
+                Email:    "user@example.com",
+                Password: "Password123!",
+                Name:     "John Doe",
+                Age:      25,
+            },
+            expectedStatus: 200,
+        },
+        {
+            name: "invalid email",
+            requestBody: schemas.CreateUserRequest{
+                Email:    "invalid-email",
+                Password: "Password123!",
+                Name:     "John Doe",
+                Age:      25,
+            },
+            expectedStatus: 422,
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            body, _ := json.Marshal(tt.requestBody)
+            req := httptest.NewRequest("POST", "/users", bytes.NewReader(body))
+            req.Header.Set("Content-Type", "application/json")
+            
+            resp, err := app.Test(req)
+            assert.NoError(t, err)
+            assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+        })
+    }
+}
+```
+
+## Best Practices
+
+### 1. **Schema Design**
+- Use descriptive field names
+- Provide example values in tags
+- Group related fields in nested structs
+- Use appropriate validation tags
+
+### 2. **Error Messages**
+- Provide clear, user-friendly error messages
+- Use consistent error format
+- Include field names in error messages
+- Avoid exposing sensitive information
+
+### 3. **Performance**
+- Cache validator instances
+- Use struct tags efficiently
+- Avoid complex validation logic in hot paths
+- Consider validation at the service layer
+
+### 4. **Security**
+- Validate all input data
+- Sanitize user input
+- Use appropriate validation rules
+- Implement rate limiting for validation endpoints
+
+## Next Steps
+
+- [Swagger Documentation](/docs/api/swagger)
+- [Response Serialization](/docs/api/responses)
+- [Error Handling](/docs/api/error-handling)
+- [Testing](/docs/contributing/testing)

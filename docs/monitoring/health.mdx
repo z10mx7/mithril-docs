@@ -1,0 +1,839 @@
+---
+title: "Health Checks"
+description: "Comprehensive health check system for application monitoring"
+---
+
+# Health Checks
+
+Mithril provides a robust health check system that monitors your application's dependencies and overall health status. This is essential for production deployments, load balancers, and monitoring systems.
+
+## Basic Health Check Endpoints
+
+### Standard Health Check
+
+```go
+// pkg/monitoring/health.go
+package monitoring
+
+import (
+    "time"
+    "github.com/gofiber/fiber/v2"
+)
+
+func HealthCheck(c *fiber.Ctx) error {
+    return c.JSON(fiber.Map{
+        "status":    "ok",
+        "timestamp": time.Now().Unix(),
+        "version":   "1.0.0",
+        "uptime":    time.Since(startTime).String(),
+    })
+}
+```
+
+**Endpoint:** `GET /health`
+
+**Response:**
+```json
+{
+    "status": "ok",
+    "timestamp": 1704067200,
+    "version": "1.0.0",
+    "uptime": "2h30m15s"
+}
+```
+
+### Liveness Check
+
+```go
+func LivenessCheck(c *fiber.Ctx) error {
+    // Simple check to see if the application is running
+    return c.JSON(fiber.Map{
+        "status": "alive",
+        "timestamp": time.Now().Unix(),
+    })
+}
+```
+
+**Endpoint:** `GET /livez`
+
+**Response:**
+```json
+{
+    "status": "alive",
+    "timestamp": 1704067200
+}
+```
+
+### Readiness Check
+
+```go
+func ReadinessCheck(c *fiber.Ctx) error {
+    // Check if the application is ready to serve traffic
+    ready := true
+    checks := make(map[string]bool)
+    
+    // Database readiness
+    if err := db.Ping(); err != nil {
+        ready = false
+        checks["database"] = false
+    } else {
+        checks["database"] = true
+    }
+    
+    // Cache readiness
+    if err := cache.Ping(); err != nil {
+        ready = false
+        checks["cache"] = false
+    } else {
+        checks["cache"] = true
+    }
+    
+    response := map[string]interface{}{
+        "ready":  ready,
+        "checks": checks,
+    }
+    
+    if !ready {
+        return c.Status(503).JSON(response)
+    }
+    
+    return c.JSON(response)
+}
+```
+
+**Endpoint:** `GET /readyz`
+
+**Response (Ready):**
+```json
+{
+    "ready": true,
+    "checks": {
+        "database": true,
+        "cache": true
+    }
+}
+```
+
+**Response (Not Ready):**
+```json
+{
+    "ready": false,
+    "checks": {
+        "database": true,
+        "cache": false
+    }
+}
+```
+
+## Advanced Health Checks
+
+### Comprehensive Health Checker
+
+```go
+// pkg/monitoring/advanced_health.go
+package monitoring
+
+import (
+    "context"
+    "time"
+    "sync"
+    "fmt"
+)
+
+type HealthChecker struct {
+    checks map[string]HealthCheckFunc
+    timeout time.Duration
+    mutex  sync.RWMutex
+}
+
+type HealthCheckFunc func(ctx context.Context) error
+
+type HealthCheckResult struct {
+    Name      string        `json:"name"`
+    Status    string        `json:"status"`
+    Duration  time.Duration `json:"duration"`
+    Error     string        `json:"error,omitempty"`
+    Timestamp time.Time     `json:"timestamp"`
+    Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+func NewHealthChecker(timeout time.Duration) *HealthChecker {
+    return &HealthChecker{
+        checks:  make(map[string]HealthCheckFunc),
+        timeout: timeout,
+    }
+}
+
+func (h *HealthChecker) RegisterCheck(name string, checker HealthCheckFunc) {
+    h.mutex.Lock()
+    defer h.mutex.Unlock()
+    h.checks[name] = checker
+}
+
+func (h *HealthChecker) RunChecks(ctx context.Context) map[string]HealthCheckResult {
+    h.mutex.RLock()
+    defer h.mutex.RUnlock()
+    
+    results := make(map[string]HealthCheckResult)
+    var wg sync.WaitGroup
+    var mu sync.Mutex
+    
+    for name, checker := range h.checks {
+        wg.Add(1)
+        go func(name string, checker HealthCheckFunc) {
+            defer wg.Done()
+            
+            start := time.Now()
+            checkCtx, cancel := context.WithTimeout(ctx, h.timeout)
+            defer cancel()
+            
+            err := checker(checkCtx)
+            duration := time.Since(start)
+            
+            mu.Lock()
+            result := HealthCheckResult{
+                Name:      name,
+                Duration:  duration,
+                Timestamp: time.Now(),
+            }
+            
+            if err != nil {
+                result.Status = "error"
+                result.Error = err.Error()
+            } else {
+                result.Status = "ok"
+            }
+            
+            results[name] = result
+            mu.Unlock()
+        }(name, checker)
+    }
+    
+    wg.Wait()
+    return results
+}
+
+func (h *HealthChecker) HealthCheck(c *fiber.Ctx) error {
+    results := h.RunChecks(c.Context())
+    
+    // Determine overall status
+    status := "ok"
+    for _, result := range results {
+        if result.Status == "error" {
+            status = "error"
+            break
+        }
+    }
+    
+    response := map[string]interface{}{
+        "status":    status,
+        "timestamp": time.Now().Unix(),
+        "checks":    results,
+    }
+    
+    if status == "error" {
+        return c.Status(503).JSON(response)
+    }
+    
+    return c.JSON(response)
+}
+```
+
+## Predefined Health Checks
+
+### Database Health Check
+
+```go
+// pkg/monitoring/checks/database.go
+package checks
+
+import (
+    "context"
+    "database/sql"
+    "time"
+)
+
+func DatabaseHealthCheck(db *sql.DB) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+        defer cancel()
+        
+        if err := db.PingContext(ctx); err != nil {
+            return fmt.Errorf("database connection failed: %w", err)
+        }
+        
+        // Optional: Run a simple query
+        var result int
+        if err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result); err != nil {
+            return fmt.Errorf("database query failed: %w", err)
+        }
+        
+        return nil
+    }
+}
+
+func DatabaseHealthCheckWithMetrics(db *sql.DB) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        start := time.Now()
+        
+        if err := db.PingContext(ctx); err != nil {
+            return fmt.Errorf("database connection failed: %w", err)
+        }
+        
+        // Get connection stats
+        stats := db.Stats()
+        
+        // Add metadata to result
+        // This would be passed through the health check result
+        _ = stats // Use stats in your metadata
+        
+        return nil
+    }
+}
+```
+
+### Cache Health Check
+
+```go
+// pkg/monitoring/checks/cache.go
+package checks
+
+import (
+    "context"
+    "time"
+    "github.com/go-redis/redis/v8"
+)
+
+func RedisHealthCheck(client *redis.Client) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+        defer cancel()
+        
+        if err := client.Ping(ctx).Err(); err != nil {
+            return fmt.Errorf("redis connection failed: %w", err)
+        }
+        
+        // Optional: Test read/write
+        testKey := "health_check_test"
+        testValue := "ok"
+        
+        if err := client.Set(ctx, testKey, testValue, 10*time.Second).Err(); err != nil {
+            return fmt.Errorf("redis write failed: %w", err)
+        }
+        
+        if val, err := client.Get(ctx, testKey).Result(); err != nil {
+            return fmt.Errorf("redis read failed: %w", err)
+        } else if val != testValue {
+            return fmt.Errorf("redis read returned unexpected value: %s", val)
+        }
+        
+        // Clean up test key
+        client.Del(ctx, testKey)
+        
+        return nil
+    }
+}
+
+func MemoryCacheHealthCheck(cache *cache.Cache) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        // Test cache operations
+        testKey := "health_check_test"
+        testValue := "ok"
+        
+        if err := cache.Set(testKey, testValue, 10*time.Second); err != nil {
+            return fmt.Errorf("cache set failed: %w", err)
+        }
+        
+        if val, err := cache.Get(testKey); err != nil {
+            return fmt.Errorf("cache get failed: %w", err)
+        } else if val != testValue {
+            return fmt.Errorf("cache get returned unexpected value: %s", val)
+        }
+        
+        // Clean up test key
+        cache.Delete(testKey)
+        
+        return nil
+    }
+}
+```
+
+### External Service Health Check
+
+```go
+// pkg/monitoring/checks/external.go
+package checks
+
+import (
+    "context"
+    "net/http"
+    "time"
+    "fmt"
+)
+
+func HTTPHealthCheck(url string, expectedStatus int) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        client := &http.Client{
+            Timeout: 10 * time.Second,
+        }
+        
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return fmt.Errorf("failed to create request: %w", err)
+        }
+        
+        resp, err := client.Do(req)
+        if err != nil {
+            return fmt.Errorf("request failed: %w", err)
+        }
+        defer resp.Body.Close()
+        
+        if resp.StatusCode != expectedStatus {
+            return fmt.Errorf("expected status %d, got %d", expectedStatus, resp.StatusCode)
+        }
+        
+        return nil
+    }
+}
+
+func APIHealthCheck(baseURL, endpoint string, headers map[string]string) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        url := baseURL + endpoint
+        client := &http.Client{
+            Timeout: 10 * time.Second,
+        }
+        
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return fmt.Errorf("failed to create request: %w", err)
+        }
+        
+        // Add headers
+        for key, value := range headers {
+            req.Header.Set(key, value)
+        }
+        
+        resp, err := client.Do(req)
+        if err != nil {
+            return fmt.Errorf("request failed: %w", err)
+        }
+        defer resp.Body.Close()
+        
+        if resp.StatusCode >= 400 {
+            return fmt.Errorf("API returned status %d", resp.StatusCode)
+        }
+        
+        return nil
+    }
+}
+```
+
+### File System Health Check
+
+```go
+// pkg/monitoring/checks/filesystem.go
+package checks
+
+import (
+    "context"
+    "os"
+    "path/filepath"
+    "fmt"
+)
+
+func DiskSpaceHealthCheck(path string, minFreeBytes int64) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        var stat syscall.Statfs_t
+        if err := syscall.Statfs(path, &stat); err != nil {
+            return fmt.Errorf("failed to get filesystem stats: %w", err)
+        }
+        
+        freeBytes := int64(stat.Bavail) * int64(stat.Bsize)
+        if freeBytes < minFreeBytes {
+            return fmt.Errorf("insufficient disk space: %d bytes free, need %d", freeBytes, minFreeBytes)
+        }
+        
+        return nil
+    }
+}
+
+func DirectoryWritableHealthCheck(path string) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        testFile := filepath.Join(path, "health_check_test")
+        
+        // Try to create a test file
+        file, err := os.Create(testFile)
+        if err != nil {
+            return fmt.Errorf("failed to create test file: %w", err)
+        }
+        file.Close()
+        
+        // Try to write to the file
+        if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+            return fmt.Errorf("failed to write to test file: %w", err)
+        }
+        
+        // Clean up test file
+        os.Remove(testFile)
+        
+        return nil
+    }
+}
+```
+
+## Custom Health Checks
+
+### Business Logic Health Check
+
+```go
+// app/health/business_checks.go
+package health
+
+import (
+    "context"
+    "my-app/app/services"
+)
+
+func UserServiceHealthCheck(userService *services.UserService) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        // Check if we can perform basic user operations
+        count, err := userService.GetUserCount(ctx)
+        if err != nil {
+            return fmt.Errorf("user service check failed: %w", err)
+        }
+        
+        // Optional: Check if count is within expected range
+        if count < 0 {
+            return fmt.Errorf("invalid user count: %d", count)
+        }
+        
+        return nil
+    }
+}
+
+func PaymentServiceHealthCheck(paymentService *services.PaymentService) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        // Check if payment service is responding
+        if err := paymentService.Ping(ctx); err != nil {
+            return fmt.Errorf("payment service check failed: %w", err)
+        }
+        
+        return nil
+    }
+}
+
+func QueueHealthCheck(queueService *services.QueueService) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        // Check if queue is processing jobs
+        stats, err := queueService.GetStats(ctx)
+        if err != nil {
+            return fmt.Errorf("queue service check failed: %w", err)
+        }
+        
+        // Check if queue is not backed up
+        if stats.PendingJobs > 1000 {
+            return fmt.Errorf("queue has too many pending jobs: %d", stats.PendingJobs)
+        }
+        
+        return nil
+    }
+}
+```
+
+## Health Check Configuration
+
+### Environment Variables
+
+```bash
+# Health Check Configuration
+HEALTH_CHECK_ENABLED=true
+HEALTH_CHECK_TIMEOUT=30s
+HEALTH_CHECK_INTERVAL=10s
+HEALTH_CHECK_PATH=/health
+LIVENESS_CHECK_PATH=/livez
+READINESS_CHECK_PATH=/readyz
+
+# Database Health Check
+DB_HEALTH_CHECK_ENABLED=true
+DB_HEALTH_CHECK_TIMEOUT=5s
+
+# Cache Health Check
+CACHE_HEALTH_CHECK_ENABLED=true
+CACHE_HEALTH_CHECK_TIMEOUT=5s
+
+# External Service Health Checks
+EXTERNAL_HEALTH_CHECKS_ENABLED=true
+PAYMENT_API_HEALTH_CHECK_URL=https://api.payment.com/health
+EMAIL_SERVICE_HEALTH_CHECK_URL=https://api.email.com/health
+```
+
+### Configuration Struct
+
+```go
+// pkg/monitoring/health_config.go
+package monitoring
+
+import "time"
+
+type HealthCheckConfig struct {
+    Enabled     bool          `env:"HEALTH_CHECK_ENABLED" default:"true"`
+    Timeout     time.Duration `env:"HEALTH_CHECK_TIMEOUT" default:"30s"`
+    Interval    time.Duration `env:"HEALTH_CHECK_INTERVAL" default:"10s"`
+    Path        string        `env:"HEALTH_CHECK_PATH" default:"/health"`
+    LivenessPath string       `env:"LIVENESS_CHECK_PATH" default:"/livez"`
+    ReadinessPath string      `env:"READINESS_CHECK_PATH" default:"/readyz"`
+    
+    Database   DatabaseHealthConfig   `envPrefix:"DB_"`
+    Cache      CacheHealthConfig      `envPrefix:"CACHE_"`
+    External   ExternalHealthConfig   `envPrefix:"EXTERNAL_"`
+}
+
+type DatabaseHealthConfig struct {
+    Enabled bool          `env:"HEALTH_CHECK_ENABLED" default:"true"`
+    Timeout time.Duration `env:"HEALTH_CHECK_TIMEOUT" default:"5s"`
+}
+
+type CacheHealthConfig struct {
+    Enabled bool          `env:"HEALTH_CHECK_ENABLED" default:"true"`
+    Timeout time.Duration `env:"HEALTH_CHECK_TIMEOUT" default:"5s"`
+}
+
+type ExternalHealthConfig struct {
+    Enabled bool `env:"HEALTH_CHECKS_ENABLED" default:"true"`
+}
+```
+
+## Application Setup
+
+### Complete Health Check Setup
+
+```go
+// main.go
+package main
+
+import (
+    "log"
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/monitoring"
+    "my-app/app/health"
+)
+
+func main() {
+    app := fiber.New()
+    
+    // Create health checker
+    healthChecker := monitoring.NewHealthChecker(30 * time.Second)
+    
+    // Register basic checks
+    healthChecker.RegisterCheck("database", monitoring.DatabaseHealthCheck(db))
+    healthChecker.RegisterCheck("cache", monitoring.CacheHealthCheck(cache))
+    healthChecker.RegisterCheck("redis", monitoring.RedisHealthCheck(redis))
+    
+    // Register business logic checks
+    healthChecker.RegisterCheck("user_service", health.UserServiceHealthCheck(userService))
+    healthChecker.RegisterCheck("payment_service", health.PaymentServiceHealthCheck(paymentService))
+    healthChecker.RegisterCheck("queue", health.QueueHealthCheck(queueService))
+    
+    // Register external service checks
+    healthChecker.RegisterCheck("payment_api", monitoring.HTTPHealthCheck("https://api.payment.com/health", 200))
+    healthChecker.RegisterCheck("email_service", monitoring.HTTPHealthCheck("https://api.email.com/health", 200))
+    
+    // Register file system checks
+    healthChecker.RegisterCheck("disk_space", monitoring.DiskSpaceHealthCheck("/", 1024*1024*1024)) // 1GB
+    healthChecker.RegisterCheck("temp_writable", monitoring.DirectoryWritableHealthCheck("/tmp"))
+    
+    // Health check routes
+    app.Get("/health", healthChecker.HealthCheck)
+    app.Get("/livez", monitoring.LivenessCheck)
+    app.Get("/readyz", monitoring.ReadinessCheck)
+    
+    // Start the application
+    log.Fatal(app.Listen(":3000"))
+}
+```
+
+## Monitoring Integration
+
+### Prometheus Integration
+
+```go
+// pkg/monitoring/health_metrics.go
+package monitoring
+
+import (
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var (
+    healthCheckDuration = promauto.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name: "health_check_duration_seconds",
+            Help: "Duration of health checks",
+        },
+        []string{"check_name", "status"},
+    )
+    
+    healthCheckStatus = promauto.NewGaugeVec(
+        prometheus.GaugeOpts{
+            Name: "health_check_status",
+            Help: "Status of health checks (1 = ok, 0 = error)",
+        },
+        []string{"check_name"},
+    )
+)
+
+func (h *HealthChecker) RunChecksWithMetrics(ctx context.Context) map[string]HealthCheckResult {
+    results := h.RunChecks(ctx)
+    
+    // Record metrics
+    for name, result := range results {
+        status := "ok"
+        if result.Status == "error" {
+            status = "error"
+        }
+        
+        healthCheckDuration.WithLabelValues(name, status).Observe(result.Duration.Seconds())
+        
+        value := 1.0
+        if result.Status == "error" {
+            value = 0.0
+        }
+        healthCheckStatus.WithLabelValues(name).Set(value)
+    }
+    
+    return results
+}
+```
+
+### Alerting Integration
+
+```go
+// pkg/monitoring/health_alerts.go
+package monitoring
+
+import (
+    "time"
+    "github.com/sirupsen/logrus"
+)
+
+type HealthAlert struct {
+    CheckName    string
+    Status       string
+    Error        string
+    Timestamp    time.Time
+    AlertSent    bool
+}
+
+type HealthAlertManager struct {
+    alerts    map[string]*HealthAlert
+    mutex     sync.RWMutex
+    notifiers []AlertNotifier
+}
+
+type AlertNotifier interface {
+    SendAlert(alert *HealthAlert) error
+}
+
+func NewHealthAlertManager() *HealthAlertManager {
+    return &HealthAlertManager{
+        alerts:    make(map[string]*HealthAlert),
+        notifiers: []AlertNotifier{},
+    }
+}
+
+func (h *HealthAlertManager) AddNotifier(notifier AlertNotifier) {
+    h.notifiers = append(h.notifiers, notifier)
+}
+
+func (h *HealthAlertManager) ProcessResults(results map[string]HealthCheckResult) {
+    h.mutex.Lock()
+    defer h.mutex.Unlock()
+    
+    for name, result := range results {
+        alert, exists := h.alerts[name]
+        
+        if result.Status == "error" {
+            if !exists || alert.Status == "ok" {
+                // New error or recovered from error
+                alert = &HealthAlert{
+                    CheckName: name,
+                    Status:    "error",
+                    Error:     result.Error,
+                    Timestamp: result.Timestamp,
+                    AlertSent: false,
+                }
+                h.alerts[name] = alert
+                
+                // Send alert
+                h.sendAlert(alert)
+            }
+        } else if exists && alert.Status == "error" {
+            // Recovered from error
+            alert.Status = "ok"
+            alert.Error = ""
+            alert.AlertSent = false
+            
+            // Send recovery notification
+            h.sendRecoveryAlert(alert)
+        }
+    }
+}
+
+func (h *HealthAlertManager) sendAlert(alert *HealthAlert) {
+    for _, notifier := range h.notifiers {
+        if err := notifier.SendAlert(alert); err != nil {
+            logrus.Errorf("Failed to send alert: %v", err)
+        }
+    }
+    alert.AlertSent = true
+}
+
+func (h *HealthAlertManager) sendRecoveryAlert(alert *HealthAlert) {
+    // Send recovery notification
+    for _, notifier := range h.notifiers {
+        if err := notifier.SendAlert(alert); err != nil {
+            logrus.Errorf("Failed to send recovery alert: %v", err)
+        }
+    }
+}
+```
+
+## Best Practices
+
+### 1. **Health Check Design**
+- Keep health checks fast and lightweight
+- Don't perform expensive operations in health checks
+- Use appropriate timeouts
+- Check critical dependencies only
+
+### 2. **Error Handling**
+- Provide meaningful error messages
+- Don't expose sensitive information
+- Use appropriate HTTP status codes
+- Log health check failures
+
+### 3. **Performance**
+- Run health checks asynchronously when possible
+- Cache results for non-critical checks
+- Use connection pooling
+- Monitor health check performance
+
+### 4. **Security**
+- Don't expose sensitive information in health checks
+- Use authentication for sensitive health endpoints
+- Rate limit health check endpoints
+- Validate input parameters
+
+### 5. **Monitoring**
+- Monitor health check performance
+- Set up alerts for health check failures
+- Track health check trends
+- Use health checks for load balancer decisions
+
+## Next Steps
+
+- [Prometheus Metrics](/docs/monitoring/metrics)
+- [OpenTelemetry Tracing](/docs/monitoring/tracing)
+- [Sentry Integration](/docs/monitoring/sentry)
+- [System Monitoring](/docs/monitoring/system)

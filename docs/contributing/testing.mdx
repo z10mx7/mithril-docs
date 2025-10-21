@@ -1,0 +1,1077 @@
+---
+title: "Testing Infrastructure"
+description: "Comprehensive testing utilities and infrastructure for Mithril applications"
+---
+
+# Testing Infrastructure
+
+Mithril provides a comprehensive testing infrastructure that makes it easy to write unit tests, integration tests, and end-to-end tests for your applications.
+
+## Testing Utilities
+
+### Test Helper
+
+```go
+// pkg/testing/helper.go
+package testing
+
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "github.com/gofiber/fiber/v2"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+)
+
+type TestHelper struct {
+    App    *fiber.App
+    Server *httptest.Server
+    t      *testing.T
+}
+
+func NewTestHelper(t *testing.T) *TestHelper {
+    app := fiber.New()
+    
+    return &TestHelper{
+        App:    app,
+        Server: httptest.NewServer(app),
+        t:      t,
+    }
+}
+
+func (h *TestHelper) Cleanup() {
+    h.Server.Close()
+}
+
+func (h *TestHelper) SetupTestRoutes() {
+    // Setup test routes
+    h.App.Get("/test", func(c *fiber.Ctx) error {
+        return c.JSON(fiber.Map{"message": "test"})
+    })
+    
+    h.App.Post("/test", func(c *fiber.Ctx) error {
+        var body map[string]interface{}
+        if err := c.BodyParser(&body); err != nil {
+            return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+        }
+        return c.JSON(body)
+    })
+}
+
+func (h *TestHelper) Get(path string) *TestResponse {
+    return h.Request("GET", path, nil, nil)
+}
+
+func (h *TestHelper) Post(path string, body interface{}) *TestResponse {
+    return h.Request("POST", path, body, nil)
+}
+
+func (h *TestHelper) Put(path string, body interface{}) *TestResponse {
+    return h.Request("PUT", path, body, nil)
+}
+
+func (h *TestHelper) Delete(path string) *TestResponse {
+    return h.Request("DELETE", path, nil, nil)
+}
+
+func (h *TestHelper) Request(method, path string, body interface{}, headers map[string]string) *TestResponse {
+    var reqBody []byte
+    var err error
+    
+    if body != nil {
+        reqBody, err = json.Marshal(body)
+        require.NoError(h.t, err)
+    }
+    
+    req, err := http.NewRequest(method, h.Server.URL+path, bytes.NewReader(reqBody))
+    require.NoError(h.t, err)
+    
+    if body != nil {
+        req.Header.Set("Content-Type", "application/json")
+    }
+    
+    for key, value := range headers {
+        req.Header.Set(key, value)
+    }
+    
+    resp, err := http.DefaultClient.Do(req)
+    require.NoError(h.t, err)
+    
+    return &TestResponse{
+        Response: resp,
+        t:        h.t,
+    }
+}
+
+type TestResponse struct {
+    *http.Response
+    t *testing.T
+}
+
+func (r *TestResponse) AssertStatus(t *testing.T, expected int) {
+    assert.Equal(t, expected, r.StatusCode)
+}
+
+func (r *TestResponse) AssertJSON(t *testing.T, expected interface{}) {
+    var actual interface{}
+    err := json.NewDecoder(r.Body).Decode(&actual)
+    require.NoError(t, err)
+    
+    assert.Equal(t, expected, actual)
+}
+
+func (r *TestResponse) AssertHeader(t *testing.T, key, expected string) {
+    assert.Equal(t, expected, r.Header.Get(key))
+}
+
+func (r *TestResponse) AssertContentType(t *testing.T, expected string) {
+    assert.Equal(t, expected, r.Header.Get("Content-Type"))
+}
+
+func (r *TestResponse) Body() string {
+    buf := new(bytes.Buffer)
+    buf.ReadFrom(r.Body)
+    return buf.String()
+}
+```
+
+### Database Testing
+
+```go
+// pkg/testing/database.go
+package testing
+
+import (
+    "database/sql"
+    "testing"
+    "github.com/stretchr/testify/require"
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
+)
+
+type DatabaseTestHelper struct {
+    DB *gorm.DB
+    t  *testing.T
+}
+
+func NewDatabaseTestHelper(t *testing.T) *DatabaseTestHelper {
+    // Use in-memory SQLite for testing
+    db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+    require.NoError(t, err)
+    
+    return &DatabaseTestHelper{
+        DB: db,
+        t:  t,
+    }
+}
+
+func (h *DatabaseTestHelper) Setup() {
+    // Run migrations
+    err := h.DB.AutoMigrate(&models.User{}, &models.Post{})
+    require.NoError(h.t, err)
+}
+
+func (h *DatabaseTestHelper) Cleanup() {
+    sqlDB, err := h.DB.DB()
+    require.NoError(h.t, err)
+    sqlDB.Close()
+}
+
+func (h *DatabaseTestHelper) SeedUsers(count int) []models.User {
+    users := make([]models.User, count)
+    for i := 0; i < count; i++ {
+        users[i] = models.User{
+            Email: fmt.Sprintf("user%d@example.com", i),
+            Name:  fmt.Sprintf("User %d", i),
+        }
+    }
+    
+    err := h.DB.Create(&users).Error
+    require.NoError(h.t, err)
+    
+    return users
+}
+
+func (h *DatabaseTestHelper) SeedPosts(userID uint, count int) []models.Post {
+    posts := make([]models.Post, count)
+    for i := 0; i < count; i++ {
+        posts[i] = models.Post{
+            Title:   fmt.Sprintf("Post %d", i),
+            Content: fmt.Sprintf("Content for post %d", i),
+            UserID:  userID,
+        }
+    }
+    
+    err := h.DB.Create(&posts).Error
+    require.NoError(h.t, err)
+    
+    return posts
+}
+
+func (h *DatabaseTestHelper) TruncateTables(tables ...string) {
+    for _, table := range tables {
+        err := h.DB.Exec("DELETE FROM " + table).Error
+        require.NoError(h.t, err)
+    }
+}
+```
+
+### Mock Services
+
+```go
+// pkg/testing/mocks.go
+package testing
+
+import (
+    "context"
+    "errors"
+    "my-app/app/services"
+)
+
+// MockUserService implements the UserService interface for testing
+type MockUserService struct {
+    users map[uint]*models.User
+    nextID uint
+}
+
+func NewMockUserService() *MockUserService {
+    return &MockUserService{
+        users: make(map[uint]*models.User),
+        nextID: 1,
+    }
+}
+
+func (m *MockUserService) GetByID(ctx context.Context, id uint) (*models.User, error) {
+    user, exists := m.users[id]
+    if !exists {
+        return nil, errors.New("user not found")
+    }
+    return user, nil
+}
+
+func (m *MockUserService) Create(ctx context.Context, req services.CreateUserRequest) (*models.User, error) {
+    user := &models.User{
+        ID:    m.nextID,
+        Email: req.Email,
+        Name:  req.Name,
+    }
+    m.users[m.nextID] = user
+    m.nextID++
+    return user, nil
+}
+
+func (m *MockUserService) Update(ctx context.Context, id uint, req services.UpdateUserRequest) (*models.User, error) {
+    user, exists := m.users[id]
+    if !exists {
+        return nil, errors.New("user not found")
+    }
+    
+    if req.Name != "" {
+        user.Name = req.Name
+    }
+    
+    return user, nil
+}
+
+func (m *MockUserService) Delete(ctx context.Context, id uint) error {
+    if _, exists := m.users[id]; !exists {
+        return errors.New("user not found")
+    }
+    delete(m.users, id)
+    return nil
+}
+
+func (m *MockUserService) List(ctx context.Context, page, perPage int) ([]*models.User, int64, error) {
+    users := make([]*models.User, 0, len(m.users))
+    for _, user := range m.users {
+        users = append(users, user)
+    }
+    
+    total := int64(len(users))
+    start := (page - 1) * perPage
+    end := start + perPage
+    
+    if start >= len(users) {
+        return []*models.User{}, total, nil
+    }
+    
+    if end > len(users) {
+        end = len(users)
+    }
+    
+    return users[start:end], total, nil
+}
+
+// MockEmailService implements the EmailService interface for testing
+type MockEmailService struct {
+    sentEmails []EmailMessage
+}
+
+type EmailMessage struct {
+    To      string
+    Subject string
+    Body    string
+}
+
+func NewMockEmailService() *MockEmailService {
+    return &MockEmailService{
+        sentEmails: make([]EmailMessage, 0),
+    }
+}
+
+func (m *MockEmailService) Send(ctx context.Context, to, subject, body string) error {
+    m.sentEmails = append(m.sentEmails, EmailMessage{
+        To:      to,
+        Subject: subject,
+        Body:    body,
+    })
+    return nil
+}
+
+func (m *MockEmailService) GetSentEmails() []EmailMessage {
+    return m.sentEmails
+}
+
+func (m *MockEmailService) Clear() {
+    m.sentEmails = make([]EmailMessage, 0)
+}
+```
+
+## Unit Testing
+
+### Controller Testing
+
+```go
+// app/controllers/user_controller_test.go
+package controllers
+
+import (
+    "context"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "my-app/pkg/testing"
+    "my-app/app/schemas"
+)
+
+func TestUserController_Create(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    // Setup
+    mockUserService := testing.NewMockUserService()
+    controller := NewUserController(mockUserService)
+    
+    helper.App.Post("/users", controller.Create)
+    
+    // Test data
+    userData := schemas.CreateUserRequest{
+        Email: "test@example.com",
+        Name:  "Test User",
+        Age:   25,
+    }
+    
+    // Execute
+    resp := helper.Post("/users", userData)
+    
+    // Assert
+    resp.AssertStatus(t, 201)
+    resp.AssertContentType(t, "application/json")
+    
+    var response map[string]interface{}
+    err := json.NewDecoder(resp.Body).Decode(&response)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "test@example.com", response["email"])
+    assert.Equal(t, "Test User", response["name"])
+    assert.Equal(t, float64(25), response["age"])
+}
+
+func TestUserController_GetByID(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    // Setup
+    mockUserService := testing.NewMockUserService()
+    controller := NewUserController(mockUserService)
+    
+    // Create a user first
+    user, err := mockUserService.Create(context.Background(), services.CreateUserRequest{
+        Email: "test@example.com",
+        Name:  "Test User",
+    })
+    require.NoError(t, err)
+    
+    helper.App.Get("/users/:id", controller.Show)
+    
+    // Execute
+    resp := helper.Get(fmt.Sprintf("/users/%d", user.ID))
+    
+    // Assert
+    resp.AssertStatus(t, 200)
+    
+    var response map[string]interface{}
+    err = json.NewDecoder(resp.Body).Decode(&response)
+    require.NoError(t, err)
+    
+    assert.Equal(t, float64(user.ID), response["id"])
+    assert.Equal(t, "test@example.com", response["email"])
+    assert.Equal(t, "Test User", response["name"])
+}
+
+func TestUserController_Update(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    // Setup
+    mockUserService := testing.NewMockUserService()
+    controller := NewUserController(mockUserService)
+    
+    // Create a user first
+    user, err := mockUserService.Create(context.Background(), services.CreateUserRequest{
+        Email: "test@example.com",
+        Name:  "Test User",
+    })
+    require.NoError(t, err)
+    
+    helper.App.Put("/users/:id", controller.Update)
+    
+    // Test data
+    updateData := schemas.UpdateUserRequest{
+        Name: "Updated User",
+    }
+    
+    // Execute
+    resp := helper.Put(fmt.Sprintf("/users/%d", user.ID), updateData)
+    
+    // Assert
+    resp.AssertStatus(t, 200)
+    
+    var response map[string]interface{}
+    err = json.NewDecoder(resp.Body).Decode(&response)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "Updated User", response["name"])
+    assert.Equal(t, "test@example.com", response["email"]) // Should remain unchanged
+}
+
+func TestUserController_Delete(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    // Setup
+    mockUserService := testing.NewMockUserService()
+    controller := NewUserController(mockUserService)
+    
+    // Create a user first
+    user, err := mockUserService.Create(context.Background(), services.CreateUserRequest{
+        Email: "test@example.com",
+        Name:  "Test User",
+    })
+    require.NoError(t, err)
+    
+    helper.App.Delete("/users/:id", controller.Delete)
+    
+    // Execute
+    resp := helper.Delete(fmt.Sprintf("/users/%d", user.ID))
+    
+    // Assert
+    resp.AssertStatus(t, 204)
+    
+    // Verify user is deleted
+    _, err = mockUserService.GetByID(context.Background(), user.ID)
+    assert.Error(t, err)
+}
+```
+
+### Service Testing
+
+```go
+// app/services/user_service_test.go
+package services
+
+import (
+    "context"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "my-app/pkg/testing"
+)
+
+func TestUserService_Create(t *testing.T) {
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    
+    dbHelper.Setup()
+    
+    userService := NewUserService(dbHelper.DB)
+    
+    req := CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+        Age:      25,
+    }
+    
+    user, err := userService.Create(context.Background(), req)
+    
+    require.NoError(t, err)
+    assert.Equal(t, "test@example.com", user.Email)
+    assert.Equal(t, "Test User", user.Name)
+    assert.Equal(t, 25, user.Age)
+    assert.NotEmpty(t, user.Password) // Should be hashed
+    assert.NotZero(t, user.ID)
+    assert.NotZero(t, user.CreatedAt)
+    assert.NotZero(t, user.UpdatedAt)
+}
+
+func TestUserService_GetByID(t *testing.T) {
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    
+    dbHelper.Setup()
+    
+    userService := NewUserService(dbHelper.DB)
+    
+    // Create a user first
+    user, err := userService.Create(context.Background(), CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+    })
+    require.NoError(t, err)
+    
+    // Get the user
+    retrievedUser, err := userService.GetByID(context.Background(), user.ID)
+    
+    require.NoError(t, err)
+    assert.Equal(t, user.ID, retrievedUser.ID)
+    assert.Equal(t, user.Email, retrievedUser.Email)
+    assert.Equal(t, user.Name, retrievedUser.Name)
+}
+
+func TestUserService_Update(t *testing.T) {
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    
+    dbHelper.Setup()
+    
+    userService := NewUserService(dbHelper.DB)
+    
+    // Create a user first
+    user, err := userService.Create(context.Background(), CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+    })
+    require.NoError(t, err)
+    
+    // Update the user
+    updateReq := UpdateUserRequest{
+        Name: "Updated User",
+        Age:  30,
+    }
+    
+    updatedUser, err := userService.Update(context.Background(), user.ID, updateReq)
+    
+    require.NoError(t, err)
+    assert.Equal(t, "Updated User", updatedUser.Name)
+    assert.Equal(t, 30, updatedUser.Age)
+    assert.Equal(t, user.Email, updatedUser.Email) // Should remain unchanged
+}
+
+func TestUserService_Delete(t *testing.T) {
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    
+    dbHelper.Setup()
+    
+    userService := NewUserService(dbHelper.DB)
+    
+    // Create a user first
+    user, err := userService.Create(context.Background(), CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+    })
+    require.NoError(t, err)
+    
+    // Delete the user
+    err = userService.Delete(context.Background(), user.ID)
+    require.NoError(t, err)
+    
+    // Try to get the user (should fail)
+    _, err = userService.GetByID(context.Background(), user.ID)
+    assert.Error(t, err)
+}
+```
+
+## Integration Testing
+
+### API Integration Tests
+
+```go
+// tests/integration/api_test.go
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "my-app/pkg/testing"
+)
+
+func TestUserAPI_Integration(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    // Setup database
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    dbHelper.Setup()
+    
+    // Setup services
+    userService := services.NewUserService(dbHelper.DB)
+    emailService := testing.NewMockEmailService()
+    
+    // Setup controllers
+    userController := controllers.NewUserController(userService)
+    authController := controllers.NewAuthController(userService, emailService)
+    
+    // Setup routes
+    helper.App.Post("/auth/register", authController.Register)
+    helper.App.Post("/auth/login", authController.Login)
+    helper.App.Get("/users/:id", middleware.Auth(), userController.Show)
+    helper.App.Put("/users/:id", middleware.Auth(), userController.Update)
+    helper.App.Delete("/users/:id", middleware.Auth(), userController.Delete)
+    
+    // Test registration
+    registerData := schemas.CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+        Age:      25,
+    }
+    
+    resp := helper.Post("/auth/register", registerData)
+    resp.AssertStatus(t, 201)
+    
+    // Test login
+    loginData := schemas.LoginRequest{
+        Email:    "test@example.com",
+        Password: "password123",
+    }
+    
+    resp = helper.Post("/auth/login", loginData)
+    resp.AssertStatus(t, 200)
+    
+    var loginResponse map[string]interface{}
+    err := json.NewDecoder(resp.Body).Decode(&loginResponse)
+    require.NoError(t, err)
+    
+    token := loginResponse["token"].(string)
+    assert.NotEmpty(t, token)
+    
+    // Test authenticated requests
+    headers := map[string]string{
+        "Authorization": "Bearer " + token,
+    }
+    
+    // Get user profile
+    resp = helper.Request("GET", "/users/1", nil, headers)
+    resp.AssertStatus(t, 200)
+    
+    // Update user
+    updateData := schemas.UpdateUserRequest{
+        Name: "Updated User",
+        Age:  30,
+    }
+    
+    resp = helper.Request("PUT", "/users/1", updateData, headers)
+    resp.AssertStatus(t, 200)
+    
+    // Verify update
+    resp = helper.Request("GET", "/users/1", nil, headers)
+    resp.AssertStatus(t, 200)
+    
+    var userResponse map[string]interface{}
+    err = json.NewDecoder(resp.Body).Decode(&userResponse)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "Updated User", userResponse["name"])
+    assert.Equal(t, float64(30), userResponse["age"])
+}
+```
+
+### Database Integration Tests
+
+```go
+// tests/integration/database_test.go
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "my-app/pkg/testing"
+)
+
+func TestDatabase_Integration(t *testing.T) {
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    defer dbHelper.Cleanup()
+    
+    dbHelper.Setup()
+    
+    // Test user creation and relationships
+    userService := services.NewUserService(dbHelper.DB)
+    postService := services.NewPostService(dbHelper.DB)
+    
+    // Create user
+    user, err := userService.Create(context.Background(), services.CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+    })
+    require.NoError(t, err)
+    
+    // Create posts for user
+    posts := []services.CreatePostRequest{
+        {Title: "Post 1", Content: "Content 1", UserID: user.ID},
+        {Title: "Post 2", Content: "Content 2", UserID: user.ID},
+        {Title: "Post 3", Content: "Content 3", UserID: user.ID},
+    }
+    
+    for _, postReq := range posts {
+        _, err := postService.Create(context.Background(), postReq)
+        require.NoError(t, err)
+    }
+    
+    // Test user with posts
+    userWithPosts, err := userService.GetWithPosts(context.Background(), user.ID)
+    require.NoError(t, err)
+    
+    assert.Equal(t, 3, len(userWithPosts.Posts))
+    assert.Equal(t, "Post 1", userWithPosts.Posts[0].Title)
+    assert.Equal(t, "Post 2", userWithPosts.Posts[1].Title)
+    assert.Equal(t, "Post 3", userWithPosts.Posts[2].Title)
+    
+    // Test post with user
+    post, err := postService.GetWithUser(context.Background(), userWithPosts.Posts[0].ID)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "Post 1", post.Title)
+    assert.Equal(t, user.ID, post.User.ID)
+    assert.Equal(t, "Test User", post.User.Name)
+}
+```
+
+## End-to-End Testing
+
+### E2E Test Suite
+
+```go
+// tests/e2e/e2e_test.go
+package e2e
+
+import (
+    "testing"
+    "time"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "my-app/pkg/testing"
+)
+
+type E2ETestSuite struct {
+    helper *testing.TestHelper
+    dbHelper *testing.DatabaseTestHelper
+    userService *services.UserService
+    emailService *testing.MockEmailService
+}
+
+func NewE2ETestSuite(t *testing.T) *E2ETestSuite {
+    helper := testing.NewTestHelper(t)
+    dbHelper := testing.NewDatabaseTestHelper(t)
+    dbHelper.Setup()
+    
+    userService := services.NewUserService(dbHelper.DB)
+    emailService := testing.NewMockEmailService()
+    
+    return &E2ETestSuite{
+        helper:       helper,
+        dbHelper:     dbHelper,
+        userService:  userService,
+        emailService: emailService,
+    }
+}
+
+func (s *E2ETestSuite) Close() {
+    s.helper.Cleanup()
+    s.dbHelper.Cleanup()
+}
+
+func (s *E2ETestSuite) SetupRoutes() {
+    // Setup all routes
+    s.helper.App.Post("/auth/register", s.authController.Register)
+    s.helper.App.Post("/auth/login", s.authController.Login)
+    s.helper.App.Get("/users", middleware.Auth(), s.userController.Index)
+    s.helper.App.Post("/users", middleware.Auth(), s.userController.Create)
+    s.helper.App.Get("/users/:id", middleware.Auth(), s.userController.Show)
+    s.helper.App.Put("/users/:id", middleware.Auth(), s.userController.Update)
+    s.helper.App.Delete("/users/:id", middleware.Auth(), s.userController.Delete)
+}
+
+func TestE2E_CompleteUserWorkflow(t *testing.T) {
+    suite := NewE2ETestSuite(t)
+    defer suite.Close()
+    
+    suite.SetupRoutes()
+    
+    // Step 1: Register a new user
+    registerData := schemas.CreateUserRequest{
+        Email:    "test@example.com",
+        Name:     "Test User",
+        Password: "password123",
+        Age:      25,
+    }
+    
+    resp := suite.helper.Post("/auth/register", registerData)
+    resp.AssertStatus(t, 201)
+    
+    // Verify email was sent
+    emails := suite.emailService.GetSentEmails()
+    assert.Len(t, emails, 1)
+    assert.Equal(t, "test@example.com", emails[0].To)
+    assert.Contains(t, emails[0].Subject, "Welcome")
+    
+    // Step 2: Login
+    loginData := schemas.LoginRequest{
+        Email:    "test@example.com",
+        Password: "password123",
+    }
+    
+    resp = suite.helper.Post("/auth/login", loginData)
+    resp.AssertStatus(t, 200)
+    
+    var loginResponse map[string]interface{}
+    err := json.NewDecoder(resp.Body).Decode(&loginResponse)
+    require.NoError(t, err)
+    
+    token := loginResponse["token"].(string)
+    assert.NotEmpty(t, token)
+    
+    // Step 3: Get user profile
+    headers := map[string]string{
+        "Authorization": "Bearer " + token,
+    }
+    
+    resp = suite.helper.Request("GET", "/users/1", nil, headers)
+    resp.AssertStatus(t, 200)
+    
+    var userResponse map[string]interface{}
+    err = json.NewDecoder(resp.Body).Decode(&userResponse)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "test@example.com", userResponse["email"])
+    assert.Equal(t, "Test User", userResponse["name"])
+    assert.Equal(t, float64(25), userResponse["age"])
+    
+    // Step 4: Update user profile
+    updateData := schemas.UpdateUserRequest{
+        Name: "Updated User",
+        Age:  30,
+    }
+    
+    resp = suite.helper.Request("PUT", "/users/1", updateData, headers)
+    resp.AssertStatus(t, 200)
+    
+    // Step 5: Verify update
+    resp = suite.helper.Request("GET", "/users/1", nil, headers)
+    resp.AssertStatus(t, 200)
+    
+    err = json.NewDecoder(resp.Body).Decode(&userResponse)
+    require.NoError(t, err)
+    
+    assert.Equal(t, "Updated User", userResponse["name"])
+    assert.Equal(t, float64(30), userResponse["age"])
+    
+    // Step 6: Create another user
+    registerData2 := schemas.CreateUserRequest{
+        Email:    "test2@example.com",
+        Name:     "Test User 2",
+        Password: "password123",
+        Age:      28,
+    }
+    
+    resp = suite.helper.Post("/auth/register", registerData2)
+    resp.AssertStatus(t, 201)
+    
+    // Step 7: List users
+    resp = suite.helper.Request("GET", "/users", nil, headers)
+    resp.AssertStatus(t, 200)
+    
+    var usersResponse map[string]interface{}
+    err = json.NewDecoder(resp.Body).Decode(&usersResponse)
+    require.NoError(t, err)
+    
+    users := usersResponse["data"].([]interface{})
+    assert.Len(t, users, 2)
+    
+    // Step 8: Delete user
+    resp = suite.helper.Request("DELETE", "/users/2", nil, headers)
+    resp.AssertStatus(t, 204)
+    
+    // Step 9: Verify deletion
+    resp = suite.helper.Request("GET", "/users/2", nil, headers)
+    resp.AssertStatus(t, 404)
+}
+```
+
+## Performance Testing
+
+### Load Testing
+
+```go
+// tests/performance/load_test.go
+package performance
+
+import (
+    "testing"
+    "sync"
+    "time"
+    "github.com/stretchr/testify/assert"
+    "my-app/pkg/testing"
+)
+
+func TestLoad_ConcurrentUsers(t *testing.T) {
+    helper := testing.NewTestHelper(t)
+    defer helper.Cleanup()
+    
+    helper.SetupTestRoutes()
+    
+    const numUsers = 100
+    const requestsPerUser = 10
+    
+    var wg sync.WaitGroup
+    var successCount int32
+    var errorCount int32
+    
+    start := time.Now()
+    
+    for i := 0; i < numUsers; i++ {
+        wg.Add(1)
+        go func(userID int) {
+            defer wg.Done()
+            
+            for j := 0; j < requestsPerUser; j++ {
+                resp := helper.Get("/test")
+                if resp.StatusCode == 200 {
+                    atomic.AddInt32(&successCount, 1)
+                } else {
+                    atomic.AddInt32(&errorCount, 1)
+                }
+            }
+        }(i)
+    }
+    
+    wg.Wait()
+    duration := time.Since(start)
+    
+    totalRequests := int32(numUsers * requestsPerUser)
+    
+    assert.Equal(t, totalRequests, successCount)
+    assert.Equal(t, int32(0), errorCount)
+    
+    t.Logf("Completed %d requests in %v", totalRequests, duration)
+    t.Logf("Requests per second: %.2f", float64(totalRequests)/duration.Seconds())
+}
+```
+
+## Test Configuration
+
+### Test Environment
+
+```bash
+# Test Configuration
+TEST_ENV=testing
+TEST_DATABASE_URL=sqlite://:memory:
+TEST_LOG_LEVEL=error
+TEST_TIMEOUT=30s
+
+# Test Data
+TEST_USER_EMAIL=test@example.com
+TEST_USER_PASSWORD=password123
+TEST_ADMIN_EMAIL=admin@example.com
+TEST_ADMIN_PASSWORD=admin123
+```
+
+### Test Setup
+
+```go
+// pkg/testing/setup.go
+package testing
+
+import (
+    "os"
+    "testing"
+    "github.com/joho/godotenv"
+)
+
+func SetupTestEnvironment() {
+    // Load test environment variables
+    godotenv.Load(".env.test")
+    
+    // Set test environment
+    os.Setenv("APP_ENV", "testing")
+    os.Setenv("DB_DRIVER", "sqlite")
+    os.Setenv("DB_NAME", ":memory:")
+    os.Setenv("LOG_LEVEL", "error")
+}
+
+func TestMain(m *testing.M) {
+    SetupTestEnvironment()
+    code := m.Run()
+    os.Exit(code)
+}
+```
+
+## Best Practices
+
+### 1. **Test Organization**
+- Use descriptive test names
+- Group related tests
+- Use table-driven tests for multiple scenarios
+- Keep tests independent and isolated
+
+### 2. **Test Data**
+- Use factories for test data generation
+- Clean up test data after each test
+- Use realistic test data
+- Avoid hardcoded values
+
+### 3. **Mocking**
+- Mock external dependencies
+- Use interfaces for better testability
+- Mock at the right level
+- Verify mock interactions
+
+### 4. **Performance**
+- Run tests in parallel when possible
+- Use in-memory databases for speed
+- Clean up resources properly
+- Monitor test execution time
+
+### 5. **Maintenance**
+- Keep tests up to date with code changes
+- Refactor tests when refactoring code
+- Remove obsolete tests
+- Document complex test scenarios
+
+## Next Steps
+
+- [Deployment](/docs/deployment/production)
+- [CI/CD Pipeline](/docs/deployment/cicd)
+- [Monitoring](/docs/monitoring/overview)
+- [Performance Optimization](/docs/core/performance)

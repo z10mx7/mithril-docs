@@ -1,0 +1,592 @@
+---
+title: "Middleware Stack"
+description: "Comprehensive middleware system for HTTP request processing"
+---
+
+# Middleware Stack
+
+Mithril provides a comprehensive middleware stack that handles various aspects of HTTP request processing. The middleware system is built on Fiber's middleware architecture and provides Laravel/Django-inspired functionality.
+
+## Built-in Middleware
+
+### 1. CORS (Cross-Origin Resource Sharing)
+
+```go
+// pkg/middleware/cors.go
+func CORS() fiber.Handler {
+    return cors.New(cors.Config{
+        AllowOrigins:     config.Get("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
+        AllowMethods:     config.Get("CORS_ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS"),
+        AllowHeaders:     config.Get("CORS_ALLOWED_HEADERS", "Content-Type,Authorization"),
+        ExposeHeaders:    config.Get("CORS_EXPOSED_HEADERS", ""),
+        MaxAge:           config.GetInt("CORS_MAX_AGE", 86400),
+        AllowCredentials: config.GetBool("CORS_ALLOW_CREDENTIALS", true),
+    })
+}
+```
+
+**Configuration:**
+```bash
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://myapp.com
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Content-Type,Authorization,X-Requested-With
+CORS_EXPOSED_HEADERS=X-Total-Count
+CORS_MAX_AGE=86400
+CORS_ALLOW_CREDENTIALS=true
+```
+
+### 2. CSRF Protection
+
+```go
+// pkg/middleware/csrf.go
+func CSRF() fiber.Handler {
+    return csrf.New(csrf.Config{
+        KeyLookup:      "header:X-CSRF-Token",
+        CookieName:     "csrf_",
+        CookieSameSite: "Lax",
+        Expiration:     time.Hour * 24,
+        KeyGenerator:   utils.GenerateCSRFKey,
+    })
+}
+```
+
+**Usage:**
+```go
+// In your routes
+app.Use(middleware.CSRF())
+
+// In your frontend
+const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+fetch('/api/data', {
+    method: 'POST',
+    headers: {
+        'X-CSRF-Token': token,
+        'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data)
+})
+```
+
+### 3. Rate Limiting
+
+```go
+// pkg/middleware/ratelimit.go
+func RateLimit() fiber.Handler {
+    return limiter.New(limiter.Config{
+        Max:        config.GetInt("RATE_LIMIT_MAX_REQUESTS", 100),
+        Expiration: time.Duration(config.GetInt("RATE_LIMIT_WINDOW_MINUTES", 15)) * time.Minute,
+        KeyGenerator: func(c *fiber.Ctx) string {
+            return c.IP()
+        },
+        LimitReached: func(c *fiber.Ctx) error {
+            return c.Status(429).JSON(fiber.Map{
+                "error": "Too Many Requests",
+                "retry_after": c.Get("Retry-After"),
+            })
+        },
+    })
+}
+```
+
+**Configuration:**
+```bash
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MINUTES=15
+RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS=false
+RATE_LIMIT_SKIP_FAILED_REQUESTS=false
+```
+
+### 4. Session Management
+
+```go
+// pkg/middleware/session.go
+func Session() fiber.Handler {
+    return session.New(session.Config{
+        Storage:    getSessionStorage(),
+        KeyLookup:  "cookie:session_id",
+        CookieName: "session",
+        Expiration: time.Duration(config.GetInt("SESSION_LIFETIME", 120)) * time.Minute,
+        Secure:     config.GetBool("SESSION_SECURE", false),
+        HTTPOnly:   config.GetBool("SESSION_HTTP_ONLY", true),
+        SameSite:   config.Get("SESSION_SAME_SITE", "Lax"),
+    })
+}
+
+func getSessionStorage() fiber.Storage {
+    driver := config.Get("SESSION_DRIVER", "memory")
+    switch driver {
+    case "database":
+        return getDatabaseStorage()
+    case "redis":
+        return getRedisStorage()
+    default:
+        return memory.New()
+    }
+}
+```
+
+**Configuration:**
+```bash
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=
+SESSION_SECURE=false
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=Lax
+```
+
+### 5. Authentication Middleware
+
+```go
+// pkg/middleware/auth.go
+func Auth() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        token := c.Get("Authorization")
+        if token == "" {
+            return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+        }
+
+        // Remove "Bearer " prefix
+        if len(token) > 7 && token[:7] == "Bearer " {
+            token = token[7:]
+        }
+
+        // Validate JWT token
+        claims, err := jwt.ValidateToken(token)
+        if err != nil {
+            return c.Status(401).JSON(fiber.Map{"error": "Invalid token"})
+        }
+
+        // Set user in context
+        c.Locals("user", claims.User)
+        c.Locals("user_id", claims.UserID)
+
+        return c.Next()
+    }
+}
+
+func OptionalAuth() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        token := c.Get("Authorization")
+        if token != "" {
+            if len(token) > 7 && token[:7] == "Bearer " {
+                token = token[7:]
+            }
+            
+            if claims, err := jwt.ValidateToken(token); err == nil {
+                c.Locals("user", claims.User)
+                c.Locals("user_id", claims.UserID)
+            }
+        }
+        
+        return c.Next()
+    }
+}
+```
+
+### 6. Role-Based Access Control (RBAC)
+
+```go
+// pkg/middleware/rbac.go
+func RequireRole(roles ...string) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        user := c.Locals("user")
+        if user == nil {
+            return c.Status(401).JSON(fiber.Map{"error": "Authentication required"})
+        }
+
+        userRoles := getUserRoles(user.(*models.User))
+        for _, role := range roles {
+            if contains(userRoles, role) {
+                return c.Next()
+            }
+        }
+
+        return c.Status(403).JSON(fiber.Map{"error": "Insufficient permissions"})
+    }
+}
+
+func RequirePermission(permissions ...string) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        user := c.Locals("user")
+        if user == nil {
+            return c.Status(401).JSON(fiber.Map{"error": "Authentication required"})
+        }
+
+        userPermissions := getUserPermissions(user.(*models.User))
+        for _, permission := range permissions {
+            if contains(userPermissions, permission) {
+                return c.Next()
+            }
+        }
+
+        return c.Status(403).JSON(fiber.Map{"error": "Insufficient permissions"})
+    }
+}
+```
+
+**Usage:**
+```go
+// Require specific role
+app.Get("/admin", middleware.Auth(), middleware.RequireRole("admin"), adminHandler)
+
+// Require specific permission
+app.Post("/posts", middleware.Auth(), middleware.RequirePermission("create_posts"), createPostHandler)
+
+// Multiple roles (OR logic)
+app.Get("/moderator", middleware.Auth(), middleware.RequireRole("admin", "moderator"), moderatorHandler)
+```
+
+### 7. Security Headers
+
+```go
+// pkg/middleware/security.go
+func Security() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        // X-Content-Type-Options
+        c.Set("X-Content-Type-Options", "nosniff")
+        
+        // X-Frame-Options
+        c.Set("X-Frame-Options", "DENY")
+        
+        // X-XSS-Protection
+        c.Set("X-XSS-Protection", "1; mode=block")
+        
+        // Referrer-Policy
+        c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+        
+        // Content-Security-Policy
+        csp := "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        c.Set("Content-Security-Policy", csp)
+        
+        // Strict-Transport-Security (HTTPS only)
+        if c.Secure() {
+            c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        }
+        
+        return c.Next()
+    }
+}
+```
+
+### 8. Request ID
+
+```go
+// pkg/middleware/request_id.go
+func RequestID() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        requestID := c.Get("X-Request-ID")
+        if requestID == "" {
+            requestID = utils.GenerateRequestID()
+        }
+        
+        c.Set("X-Request-ID", requestID)
+        c.Locals("request_id", requestID)
+        
+        return c.Next()
+    }
+}
+```
+
+### 9. Logger Middleware
+
+```go
+// pkg/middleware/logger.go
+func Logger() fiber.Handler {
+    return logger.New(logger.Config{
+        Format:     "${time} ${status} - ${method} ${path} (${ip}) ${latency}\n",
+        TimeFormat: "2006-01-02 15:04:05",
+        TimeZone:   "UTC",
+        Output:     os.Stdout,
+    })
+}
+
+func StructuredLogger() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        start := time.Now()
+        
+        err := c.Next()
+        
+        log := map[string]interface{}{
+            "timestamp":   time.Now().Format(time.RFC3339),
+            "method":      c.Method(),
+            "path":        c.Path(),
+            "status":      c.Response().StatusCode(),
+            "latency":     time.Since(start).String(),
+            "ip":          c.IP(),
+            "user_agent":  c.Get("User-Agent"),
+            "request_id":  c.Locals("request_id"),
+        }
+        
+        if user := c.Locals("user"); user != nil {
+            log["user_id"] = user.(*models.User).ID
+        }
+        
+        if err != nil {
+            log["error"] = err.Error()
+        }
+        
+        jsonLog, _ := json.Marshal(log)
+        fmt.Println(string(jsonLog))
+        
+        return err
+    }
+}
+```
+
+### 10. Recovery Middleware
+
+```go
+// pkg/middleware/recovery.go
+func Recovery() fiber.Handler {
+    return recovery.New(recovery.Config{
+        EnableStackTrace: true,
+        StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+            log.Printf("Panic recovered: %v\n%s", e, debug.Stack())
+        },
+    })
+}
+```
+
+### 11. Compression
+
+```go
+// pkg/middleware/compression.go
+func Compression() fiber.Handler {
+    return compress.New(compress.Config{
+        Level: compress.LevelBestSpeed,
+    })
+}
+```
+
+## Custom Middleware
+
+### Creating Custom Middleware
+
+```go
+// app/middleware/custom_middleware.go
+package middleware
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "time"
+)
+
+func CustomMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        // Before request processing
+        start := time.Now()
+        
+        // Process request
+        err := c.Next()
+        
+        // After request processing
+        duration := time.Since(start)
+        
+        // Log or perform other operations
+        if duration > time.Second {
+            // Log slow requests
+        }
+        
+        return err
+    }
+}
+```
+
+### Middleware with Configuration
+
+```go
+// app/middleware/api_key.go
+package middleware
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "strings"
+)
+
+type APIKeyConfig struct {
+    HeaderName string
+    ValidKeys  []string
+}
+
+func APIKey(config APIKeyConfig) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        apiKey := c.Get(config.HeaderName)
+        if apiKey == "" {
+            return c.Status(401).JSON(fiber.Map{"error": "API key required"})
+        }
+        
+        for _, validKey := range config.ValidKeys {
+            if apiKey == validKey {
+                return c.Next()
+            }
+        }
+        
+        return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
+    }
+}
+```
+
+**Usage:**
+```go
+app.Use(middleware.APIKey(middleware.APIKeyConfig{
+    HeaderName: "X-API-Key",
+    ValidKeys:  []string{"key1", "key2", "key3"},
+}))
+```
+
+## Middleware Order
+
+The order of middleware is important. Here's the recommended order:
+
+```go
+func setupMiddleware(app *fiber.App) {
+    // 1. Recovery (first to catch panics)
+    app.Use(middleware.Recovery())
+    
+    // 2. Request ID (for tracing)
+    app.Use(middleware.RequestID())
+    
+    // 3. Logger (for request logging)
+    app.Use(middleware.StructuredLogger())
+    
+    // 4. Security headers
+    app.Use(middleware.Security())
+    
+    // 5. Compression
+    app.Use(middleware.Compression())
+    
+    // 6. CORS
+    app.Use(middleware.CORS())
+    
+    // 7. Rate limiting
+    app.Use(middleware.RateLimit())
+    
+    // 8. Session management
+    app.Use(middleware.Session())
+    
+    // 9. CSRF protection (after session)
+    app.Use(middleware.CSRF())
+    
+    // 10. Custom middleware
+    app.Use(middleware.CustomMiddleware())
+}
+```
+
+## Route-Specific Middleware
+
+```go
+// Apply middleware to specific routes
+app.Get("/public", publicHandler)
+
+// Protected routes
+app.Use(middleware.Auth())
+app.Get("/protected", protectedHandler)
+
+// Admin routes
+app.Use(middleware.RequireRole("admin"))
+app.Get("/admin", adminHandler)
+
+// API routes with different middleware
+api := app.Group("/api", middleware.APIKey(config))
+api.Get("/data", dataHandler)
+```
+
+## Middleware Testing
+
+```go
+// pkg/testing/middleware_test.go
+func TestAuthMiddleware(t *testing.T) {
+    app := fiber.New()
+    app.Use(middleware.Auth())
+    app.Get("/test", func(c *fiber.Ctx) error {
+        return c.JSON(fiber.Map{"user": c.Locals("user")})
+    })
+    
+    // Test without token
+    req := httptest.NewRequest("GET", "/test", nil)
+    resp, err := app.Test(req)
+    assert.NoError(t, err)
+    assert.Equal(t, 401, resp.StatusCode)
+    
+    // Test with valid token
+    token := generateTestToken()
+    req = httptest.NewRequest("GET", "/test", nil)
+    req.Header.Set("Authorization", "Bearer "+token)
+    resp, err = app.Test(req)
+    assert.NoError(t, err)
+    assert.Equal(t, 200, resp.StatusCode)
+}
+```
+
+## Configuration
+
+All middleware can be configured through environment variables:
+
+```bash
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://myapp.com
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Content-Type,Authorization,X-Requested-With
+CORS_EXPOSED_HEADERS=X-Total-Count
+CORS_MAX_AGE=86400
+CORS_ALLOW_CREDENTIALS=true
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MINUTES=15
+RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS=false
+RATE_LIMIT_SKIP_FAILED_REQUESTS=false
+
+# Session Configuration
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=
+SESSION_SECURE=false
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=Lax
+
+# Security Headers
+SECURITY_HEADERS_ENABLED=true
+CSP_ENABLED=true
+HSTS_ENABLED=true
+```
+
+## Best Practices
+
+### 1. **Middleware Order**
+- Place recovery middleware first
+- Add logging and request ID early
+- Apply security headers before business logic
+- Use authentication before authorization
+
+### 2. **Performance**
+- Use compression for text responses
+- Implement proper caching headers
+- Avoid expensive operations in middleware
+- Use connection pooling for database middleware
+
+### 3. **Security**
+- Always validate input
+- Use HTTPS in production
+- Implement proper CORS policies
+- Apply rate limiting appropriately
+
+### 4. **Error Handling**
+- Use structured logging
+- Don't expose sensitive information
+- Implement proper error responses
+- Use request IDs for tracing
+
+## Next Steps
+
+- [Request/Response Validation](/docs/api/validation)
+- [Authentication System](/docs/authentication/jwt)
+- [Role-Based Access Control](/docs/authentication/rbac)
+- [Monitoring & Logging](/docs/monitoring/overview)

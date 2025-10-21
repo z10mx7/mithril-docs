@@ -1,0 +1,343 @@
+---
+title: "Installation"
+description: "Install Mithril framework and get started"
+---
+
+# Installation
+
+This guide will help you install the Mithril framework and get started with your first project.
+
+## Prerequisites
+
+Before installing Mithril, make sure you have the following installed:
+
+- **Go 1.21 or later** - [Download Go](https://golang.org/dl/)
+- **Git** - [Download Git](https://git-scm.com/downloads)
+- **Docker** (optional) - [Download Docker](https://www.docker.com/get-started)
+- **PostgreSQL** (optional, for local development) - [Download PostgreSQL](https://www.postgresql.org/download/)
+
+## Installation Methods
+
+### Method 1: Install via Go (Recommended)
+
+```bash
+# Install the global CLI tool
+go install github.com/mithril-framework/mithril/cmd/mithril@latest
+
+# Verify installation
+mithril --version
+```
+
+### Method 2: Install from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/mithril-framework/mithril.git
+cd mithril
+
+# Build and install
+go build -o mithril cmd/mithril/main.go
+sudo mv mithril /usr/local/bin/
+
+# Verify installation
+mithril --version
+```
+
+### Method 3: Using Go Modules (For Development)
+
+```bash
+# Create a new directory for your project
+mkdir my-mithril-project
+cd my-mithril-project
+
+# Initialize Go module
+go mod init my-mithril-project
+
+# Add Mithril as a dependency
+go get github.com/mithril-framework/mithril@latest
+
+# Create a simple main.go
+cat > main.go << 'EOF'
+package main
+
+import (
+    "log"
+    "github.com/mithril-framework/mithril/pkg/core"
+)
+
+func main() {
+    app := core.NewApplication()
+    log.Fatal(app.Listen(":3000"))
+}
+EOF
+
+# Run the application
+go run main.go
+```
+
+## Quick Start
+
+### 1. Create a New Project
+
+```bash
+# Create a new Mithril project
+mithril new my-awesome-app
+
+# Navigate to the project directory
+cd my-awesome-app
+
+# Install dependencies
+go mod tidy
+```
+
+### 2. Configure Environment
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit the environment file
+nano .env
+```
+
+### 3. Set Up Database
+
+```bash
+# Run database migrations
+go run . artisan migrate
+
+# Seed the database (optional)
+go run . artisan db:seed
+```
+
+### 4. Start Development Server
+
+```bash
+# Start the development server with live reload
+go run . artisan serve
+
+# Or start with custom port
+go run . artisan serve --port=8080
+```
+
+### 5. Access Your Application
+
+- **Web Application**: http://localhost:3000
+- **API Documentation**: http://localhost:3000/docs
+- **Health Check**: http://localhost:3000/health
+
+## Project Structure
+
+After creating a new project, you'll have the following structure:
+
+```
+my-awesome-app/
+├── app/
+│   ├── controllers/          # HTTP controllers
+│   ├── middleware/           # Custom middleware
+│   ├── models/              # Database models
+│   ├── schemas/             # Request/response schemas
+│   └── modules/             # Django-style modules
+├── config/                  # Configuration files
+├── database/
+│   ├── migrations/          # Database migrations
+│   └── seeders/            # Database seeders
+├── routes/
+│   ├── api.go              # API routes
+│   ├── web.go              # Web routes
+│   └── console.go          # Console commands
+├── templates/              # HTML templates
+├── utils/                  # Utility functions
+├── artisan                 # Local CLI script
+├── main.go                 # Application entry point
+├── Makefile               # Build commands
+├── Dockerfile             # Docker configuration
+├── docker-compose.*.yml   # Docker Compose files
+└── .env                   # Environment variables
+```
+
+## Configuration
+
+### Environment Variables
+
+Mithril uses environment variables for configuration. Copy `.env.example` to `.env` and customize:
+
+```bash
+# Application
+APP_NAME="My Awesome App"
+APP_ENV=development
+APP_DEBUG=true
+APP_PORT=3000
+APP_HOST=localhost
+
+# Database
+DB_DRIVER=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=my_awesome_app
+DB_USER=postgres
+DB_PASSWORD=password
+
+# JWT
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRY=24h
+
+# Mail
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-password
+
+# Storage
+STORAGE_DRIVER=local
+# For S3/MinIO
+STORAGE_S3_BUCKET=my-bucket
+STORAGE_S3_REGION=us-east-1
+```
+
+## Database Setup
+
+### PostgreSQL (Recommended)
+
+```bash
+# Install PostgreSQL
+# Ubuntu/Debian
+sudo apt-get install postgresql postgresql-contrib
+
+# macOS
+brew install postgresql
+
+# Start PostgreSQL
+sudo service postgresql start
+
+# Create database
+sudo -u postgres createdb my_awesome_app
+```
+
+### MySQL
+
+```bash
+# Install MySQL
+# Ubuntu/Debian
+sudo apt-get install mysql-server
+
+# macOS
+brew install mysql
+
+# Start MySQL
+sudo service mysql start
+
+# Create database
+mysql -u root -p
+CREATE DATABASE my_awesome_app;
+```
+
+### SQLite (Development)
+
+No additional setup required. SQLite will create the database file automatically.
+
+## Docker Setup
+
+### Using Docker Compose
+
+```bash
+# Start all services (database, redis, etc.)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Run migrations
+go run . artisan migrate
+
+# Start the application
+go run . artisan serve
+```
+
+### Using Docker
+
+```bash
+# Build the Docker image
+docker build -t my-awesome-app .
+
+# Run the container
+docker run -p 3000:3000 my-awesome-app
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Go Version Error
+
+```
+go: requires go >= 1.21
+```
+
+**Solution**: Update Go to version 1.21 or later.
+
+#### 2. Database Connection Error
+
+```
+failed to connect to database
+```
+
+**Solution**: 
+- Check if the database server is running
+- Verify connection details in `.env`
+- Ensure the database exists
+
+#### 3. Port Already in Use
+
+```
+bind: address already in use
+```
+
+**Solution**: 
+- Use a different port: `go run . artisan serve --port=8080`
+- Kill the process using the port: `lsof -ti:3000 | xargs kill -9`
+
+#### 4. Permission Denied
+
+```
+permission denied
+```
+
+**Solution**: 
+- Use `sudo` for global installation
+- Check file permissions
+- Ensure you have write access to the directory
+
+### Getting Help
+
+- **Documentation**: https://mithril-framework.dev/docs
+- **GitHub Issues**: https://github.com/mithril-framework/mithril/issues
+- **Discord Community**: https://discord.gg/mithril
+- **Stack Overflow**: Tag your questions with `mithril-framework`
+
+## Next Steps
+
+1. **Read the Documentation**: https://mithril-framework.dev/docs
+2. **Try the Tutorial**: https://mithril-framework.dev/tutorial
+3. **Explore Examples**: https://github.com/mithril-framework/examples
+4. **Join the Community**: https://discord.gg/mithril
+
+## Uninstallation
+
+### Remove Global CLI
+
+```bash
+# If installed via go install
+go clean -i github.com/mithril-framework/mithril/cmd/mithril
+
+# If installed manually
+sudo rm /usr/local/bin/mithril
+```
+
+### Remove from Go Module
+
+```bash
+# Remove from go.mod
+go mod edit -droprequire github.com/mithril-framework/mithril
+
+# Clean module cache
+go clean -modcache
+```

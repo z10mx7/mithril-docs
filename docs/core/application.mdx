@@ -1,0 +1,426 @@
+---
+title: "Application Structure"
+description: "Understanding the Mithril application architecture"
+---
+
+# Application Structure
+
+Mithril follows a well-organized, modular architecture that promotes clean code and separation of concerns. This guide will help you understand how Mithril applications are structured.
+
+## Directory Structure
+
+A typical Mithril application follows this structure:
+
+```
+my-app/
+├── app/                    # Application code
+│   ├── controllers/       # HTTP controllers
+│   ├── middleware/        # Custom middleware
+│   ├── models/           # Database models
+│   ├── schemas/          # Request/response validation
+│   └── modules/          # Django-style modules
+├── config/               # Configuration files
+├── database/
+│   ├── migrations/       # Database migrations
+│   └── seeders/         # Database seeders
+├── routes/              # Route definitions
+│   ├── api.go          # API routes
+│   ├── web.go          # Web routes
+│   └── console.go      # Console commands
+├── templates/          # HTML templates
+├── utils/             # Utility functions
+├── artisan           # Local CLI script
+├── main.go           # Application entry point
+├── Makefile         # Build commands
+├── Dockerfile       # Docker configuration
+└── docker-compose.*.yml # Docker Compose files
+```
+
+## Core Components
+
+### 1. Application Entry Point (`main.go`)
+
+The `main.go` file is the entry point of your Mithril application:
+
+```go
+package main
+
+import (
+    "log"
+    "github.com/mithril-framework/mithril/pkg/core"
+    "my-app/routes"
+)
+
+func main() {
+    // Create new application instance
+    app := core.NewApplication()
+    
+    // Setup routes
+    routes.SetupAPIRoutes(app)
+    routes.SetupWebRoutes(app)
+    
+    // Start the server
+    log.Fatal(app.Listen(":3000"))
+}
+```
+
+### 2. Application Core (`pkg/core`)
+
+The core package provides the foundation of Mithril:
+
+```go
+// pkg/core/application.go
+type Application struct {
+    *fiber.App
+    config *config.Manager
+    container *container.Container
+}
+
+func NewApplication() *Application {
+    app := &Application{
+        App: fiber.New(fiber.Config{
+            AppName: "Mithril App",
+        }),
+    }
+    
+    // Initialize configuration
+    app.config = config.NewManagerFromEnv()
+    
+    // Initialize dependency injection container
+    app.container = container.New()
+    
+    // Setup middleware
+    app.setupMiddleware()
+    
+    return app
+}
+```
+
+### 3. Configuration Management (`config/`)
+
+Configuration is managed through environment variables and structured config files:
+
+```go
+// config/app.go
+type AppConfig struct {
+    Name        string `env:"APP_NAME" default:"Mithril App"`
+    Environment string `env:"APP_ENV" default:"development"`
+    Debug       bool   `env:"APP_DEBUG" default:"false"`
+    Host        string `env:"APP_HOST" default:"localhost"`
+    Port        int    `env:"APP_PORT" default:"3000"`
+}
+
+// config/database.go
+type DatabaseConfig struct {
+    Driver   string `env:"DB_DRIVER" default:"postgres"`
+    Host     string `env:"DB_HOST" default:"localhost"`
+    Port     int    `env:"DB_PORT" default:"5432"`
+    Name     string `env:"DB_NAME" required:"true"`
+    User     string `env:"DB_USER" required:"true"`
+    Password string `env:"DB_PASSWORD" required:"true"`
+}
+```
+
+### 4. Dependency Injection Container (`pkg/core/container`)
+
+Mithril includes a service container for dependency injection:
+
+```go
+// pkg/core/container/container.go
+type Container struct {
+    services map[string]interface{}
+    singletons map[string]interface{}
+}
+
+func (c *Container) Bind(name string, resolver interface{}) {
+    c.services[name] = resolver
+}
+
+func (c *Container) Singleton(name string, resolver interface{}) {
+    c.singletons[name] = resolver
+}
+
+func (c *Container) Make(name string) interface{} {
+    // Resolve service from container
+}
+```
+
+## Application Layers
+
+### 1. Controllers (`app/controllers/`)
+
+Controllers handle HTTP requests and responses:
+
+```go
+// app/controllers/user_controller.go
+type UserController struct {
+    userService *services.UserService
+}
+
+func NewUserController(userService *services.UserService) *UserController {
+    return &UserController{
+        userService: userService,
+    }
+}
+
+func (c *UserController) Index(ctx *fiber.Ctx) error {
+    users, err := c.userService.GetAll()
+    if err != nil {
+        return ctx.Status(500).JSON(fiber.Map{"error": err.Error()})
+    }
+    
+    return ctx.JSON(fiber.Map{"data": users})
+}
+
+func (c *UserController) Store(ctx *fiber.Ctx) error {
+    var req schemas.CreateUserRequest
+    if err := ctx.BodyParser(&req); err != nil {
+        return ctx.Status(400).JSON(fiber.Map{"error": err.Error()})
+    }
+    
+    user, err := c.userService.Create(req)
+    if err != nil {
+        return ctx.Status(400).JSON(fiber.Map{"error": err.Error()})
+    }
+    
+    return ctx.Status(201).JSON(fiber.Map{"data": user})
+}
+```
+
+### 2. Models (`app/models/`)
+
+Models represent your database entities:
+
+```go
+// app/models/user.go
+type User struct {
+    ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+    Email     string    `json:"email" gorm:"uniqueIndex;not null"`
+    Name      string    `json:"name" gorm:"not null"`
+    Password  string    `json:"-"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
+
+// Relationships
+func (u *User) Posts() []Post {
+    var posts []Post
+    db.Model(u).Association("Posts").Find(&posts)
+    return posts
+}
+```
+
+### 3. Schemas (`app/schemas/`)
+
+Schemas define request/response validation:
+
+```go
+// app/schemas/user_request.go
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+    Password string `json:"password" validate:"required,min=8" example:"password123"`
+    Name     string `json:"name" validate:"required" example:"John Doe"`
+}
+
+type UpdateUserRequest struct {
+    Name string `json:"name" validate:"required" example:"John Doe"`
+}
+
+// app/schemas/user_response.go
+type UserResponse struct {
+    ID        uuid.UUID `json:"id"`
+    Email     string    `json:"email"`
+    Name      string    `json:"name"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+}
+```
+
+### 4. Middleware (`app/middleware/`)
+
+Custom middleware for request processing:
+
+```go
+// app/middleware/auth.go
+func AuthMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        token := c.Get("Authorization")
+        if token == "" {
+            return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+        }
+        
+        // Validate JWT token
+        claims, err := jwt.ValidateToken(token)
+        if err != nil {
+            return c.Status(401).JSON(fiber.Map{"error": "Invalid token"})
+        }
+        
+        // Set user in context
+        c.Locals("user", claims.User)
+        
+        return c.Next()
+    }
+}
+```
+
+## Route Organization
+
+### 1. API Routes (`routes/api.go`)
+
+```go
+// routes/api.go
+func SetupAPIRoutes(app *fiber.App) {
+    api := app.Group("/api")
+    
+    // Public routes
+    api.Post("/auth/login", authController.Login)
+    api.Post("/auth/register", authController.Register)
+    
+    // Protected routes
+    protected := api.Group("/", middleware.AuthMiddleware())
+    protected.Get("/users", userController.Index)
+    protected.Post("/users", userController.Store)
+    protected.Get("/users/:id", userController.Show)
+    protected.Put("/users/:id", userController.Update)
+    protected.Delete("/users/:id", userController.Delete)
+}
+```
+
+### 2. Web Routes (`routes/web.go`)
+
+```go
+// routes/web.go
+func SetupWebRoutes(app *fiber.App) {
+    // Serve static files
+    app.Static("/", "./public")
+    
+    // Web routes
+    app.Get("/", webController.Home)
+    app.Get("/about", webController.About)
+    app.Get("/contact", webController.Contact)
+}
+```
+
+## Module System
+
+Mithril supports Django-style modules for organizing related functionality:
+
+### 1. Creating a Module
+
+```bash
+# Create a complete module
+go run . artisan make:module blog --full
+```
+
+This creates:
+```
+app/modules/blog/
+├── controllers/
+│   ├── post_controller.go
+│   └── category_controller.go
+├── models/
+│   ├── post.go
+│   └── category.go
+├── schemas/
+│   ├── post_request.go
+│   ├── post_response.go
+│   ├── category_request.go
+│   └── category_response.go
+├── routes.go
+└── README.md
+```
+
+### 2. Module Routes
+
+```go
+// app/modules/blog/routes.go
+func SetupBlogRoutes(app *fiber.App) {
+    blog := app.Group("/blog")
+    
+    // Post routes
+    blog.Get("/posts", postController.Index)
+    blog.Post("/posts", postController.Store)
+    blog.Get("/posts/:id", postController.Show)
+    blog.Put("/posts/:id", postController.Update)
+    blog.Delete("/posts/:id", postController.Delete)
+    
+    // Category routes
+    blog.Get("/categories", categoryController.Index)
+    blog.Post("/categories", categoryController.Store)
+}
+```
+
+## Service Layer
+
+While not required, you can create a service layer for business logic:
+
+```go
+// app/services/user_service.go
+type UserService struct {
+    userRepo *repositories.UserRepository
+}
+
+func NewUserService(userRepo *repositories.UserRepository) *UserService {
+    return &UserService{
+        userRepo: userRepo,
+    }
+}
+
+func (s *UserService) GetAll() ([]models.User, error) {
+    return s.userRepo.FindAll()
+}
+
+func (s *UserService) Create(req schemas.CreateUserRequest) (*models.User, error) {
+    // Hash password
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+    if err != nil {
+        return nil, err
+    }
+    
+    user := &models.User{
+        Email:    req.Email,
+        Name:     req.Name,
+        Password: string(hashedPassword),
+    }
+    
+    return s.userRepo.Create(user)
+}
+```
+
+## Best Practices
+
+### 1. **Separation of Concerns**
+- Keep controllers thin
+- Move business logic to services
+- Use repositories for data access
+
+### 2. **Error Handling**
+- Use consistent error responses
+- Log errors appropriately
+- Return meaningful error messages
+
+### 3. **Code Organization**
+- Group related functionality in modules
+- Use meaningful names for files and functions
+- Keep functions small and focused
+
+### 4. **Configuration**
+- Use environment variables for configuration
+- Provide sensible defaults
+- Validate configuration on startup
+
+### 5. **Testing**
+- Write unit tests for business logic
+- Use integration tests for API endpoints
+- Mock external dependencies
+
+## Next Steps
+
+Now that you understand the application structure, explore these topics:
+
+- [Configuration Management](/docs/core/configuration)
+- [Dependency Injection](/docs/core/container)
+- [Middleware Stack](/docs/core/middleware)
+- [Database Models](/docs/database/models)
+- [API Development](/docs/api/overview)

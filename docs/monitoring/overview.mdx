@@ -1,0 +1,1044 @@
+---
+title: "Monitoring & Observability"
+description: "Comprehensive monitoring, metrics, and observability features"
+---
+
+# Monitoring & Observability
+
+Mithril provides comprehensive monitoring and observability features to help you understand your application's performance, health, and behavior in production.
+
+## Health Checks
+
+### Basic Health Check
+
+```go
+// pkg/monitoring/health.go
+package monitoring
+
+import (
+    "time"
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/database"
+    "my-app/pkg/cache"
+)
+
+type HealthChecker struct {
+    db    *database.Connection
+    cache *cache.Client
+}
+
+func NewHealthChecker(db *database.Connection, cache *cache.Client) *HealthChecker {
+    return &HealthChecker{
+        db:    db,
+        cache: cache,
+    }
+}
+
+func (h *HealthChecker) HealthCheck(c *fiber.Ctx) error {
+    status := "ok"
+    checks := make(map[string]interface{})
+    
+    // Database check
+    if err := h.db.Ping(); err != nil {
+        status = "error"
+        checks["database"] = map[string]interface{}{
+            "status": "error",
+            "error":  err.Error(),
+        }
+    } else {
+        checks["database"] = map[string]interface{}{
+            "status": "ok",
+        }
+    }
+    
+    // Cache check
+    if err := h.cache.Ping(); err != nil {
+        status = "error"
+        checks["cache"] = map[string]interface{}{
+            "status": "error",
+            "error":  err.Error(),
+        }
+    } else {
+        checks["cache"] = map[string]interface{}{
+            "status": "ok",
+        }
+    }
+    
+    // Application info
+    checks["application"] = map[string]interface{}{
+        "status":    "ok",
+        "version":   "1.0.0",
+        "timestamp": time.Now().Unix(),
+        "uptime":    time.Since(startTime).String(),
+    }
+    
+    response := map[string]interface{}{
+        "status": status,
+        "checks": checks,
+    }
+    
+    if status == "error" {
+        return c.Status(503).JSON(response)
+    }
+    
+    return c.JSON(response)
+}
+
+func (h *HealthChecker) LivenessCheck(c *fiber.Ctx) error {
+    return c.JSON(map[string]interface{}{
+        "status": "alive",
+        "timestamp": time.Now().Unix(),
+    })
+}
+
+func (h *HealthChecker) ReadinessCheck(c *fiber.Ctx) error {
+    // Check if application is ready to serve traffic
+    ready := true
+    checks := make(map[string]bool)
+    
+    // Database readiness
+    if err := h.db.Ping(); err != nil {
+        ready = false
+        checks["database"] = false
+    } else {
+        checks["database"] = true
+    }
+    
+    // Cache readiness
+    if err := h.cache.Ping(); err != nil {
+        ready = false
+        checks["cache"] = false
+    } else {
+        checks["cache"] = true
+    }
+    
+    response := map[string]interface{}{
+        "ready":  ready,
+        "checks": checks,
+    }
+    
+    if !ready {
+        return c.Status(503).JSON(response)
+    }
+    
+    return c.JSON(response)
+}
+```
+
+### Advanced Health Check
+
+```go
+// pkg/monitoring/advanced_health.go
+package monitoring
+
+import (
+    "context"
+    "time"
+    "sync"
+)
+
+type AdvancedHealthChecker struct {
+    checkers map[string]HealthCheckFunc
+    timeout  time.Duration
+}
+
+type HealthCheckFunc func(ctx context.Context) error
+
+type HealthCheckResult struct {
+    Name      string        `json:"name"`
+    Status    string        `json:"status"`
+    Duration  time.Duration `json:"duration"`
+    Error     string        `json:"error,omitempty"`
+    Timestamp time.Time     `json:"timestamp"`
+}
+
+func NewAdvancedHealthChecker(timeout time.Duration) *AdvancedHealthChecker {
+    return &AdvancedHealthChecker{
+        checkers: make(map[string]HealthCheckFunc),
+        timeout:  timeout,
+    }
+}
+
+func (h *AdvancedHealthChecker) RegisterCheck(name string, checker HealthCheckFunc) {
+    h.checkers[name] = checker
+}
+
+func (h *AdvancedHealthChecker) RunChecks(ctx context.Context) map[string]HealthCheckResult {
+    results := make(map[string]HealthCheckResult)
+    var wg sync.WaitGroup
+    var mu sync.Mutex
+    
+    for name, checker := range h.checkers {
+        wg.Add(1)
+        go func(name string, checker HealthCheckFunc) {
+            defer wg.Done()
+            
+            start := time.Now()
+            checkCtx, cancel := context.WithTimeout(ctx, h.timeout)
+            defer cancel()
+            
+            err := checker(checkCtx)
+            duration := time.Since(start)
+            
+            mu.Lock()
+            result := HealthCheckResult{
+                Name:      name,
+                Duration:  duration,
+                Timestamp: time.Now(),
+            }
+            
+            if err != nil {
+                result.Status = "error"
+                result.Error = err.Error()
+            } else {
+                result.Status = "ok"
+            }
+            
+            results[name] = result
+            mu.Unlock()
+        }(name, checker)
+    }
+    
+    wg.Wait()
+    return results
+}
+
+// Predefined health checks
+func DatabaseHealthCheck(db *database.Connection) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        return db.Ping()
+    }
+}
+
+func CacheHealthCheck(cache *cache.Client) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        return cache.Ping()
+    }
+}
+
+func RedisHealthCheck(redis *redis.Client) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        return redis.Ping(ctx).Err()
+    }
+}
+
+func ExternalAPIHealthCheck(url string) HealthCheckFunc {
+    return func(ctx context.Context) error {
+        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil {
+            return err
+        }
+        
+        client := &http.Client{Timeout: 5 * time.Second}
+        resp, err := client.Do(req)
+        if err != nil {
+            return err
+        }
+        defer resp.Body.Close()
+        
+        if resp.StatusCode >= 400 {
+            return fmt.Errorf("API returned status %d", resp.StatusCode)
+        }
+        
+        return nil
+    }
+}
+```
+
+## Prometheus Metrics
+
+### Metrics Collection
+
+```go
+// pkg/monitoring/metrics.go
+package monitoring
+
+import (
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+    "github.com/gofiber/fiber/v2"
+    "time"
+)
+
+type Metrics struct {
+    // HTTP metrics
+    httpRequestsTotal     *prometheus.CounterVec
+    httpRequestDuration   *prometheus.HistogramVec
+    httpRequestSize       *prometheus.HistogramVec
+    httpResponseSize      *prometheus.HistogramVec
+    
+    // Database metrics
+    dbConnectionsActive   prometheus.Gauge
+    dbConnectionsIdle     prometheus.Gauge
+    dbQueriesTotal        *prometheus.CounterVec
+    dbQueryDuration       *prometheus.HistogramVec
+    
+    // Cache metrics
+    cacheHitsTotal        *prometheus.CounterVec
+    cacheMissesTotal      *prometheus.CounterVec
+    cacheOperationsTotal  *prometheus.CounterVec
+    
+    // Business metrics
+    usersTotal            prometheus.Gauge
+    ordersTotal           *prometheus.CounterVec
+    revenueTotal          *prometheus.CounterVec
+}
+
+func NewMetrics() *Metrics {
+    return &Metrics{
+        httpRequestsTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "http_requests_total",
+                Help: "Total number of HTTP requests",
+            },
+            []string{"method", "endpoint", "status_code"},
+        ),
+        
+        httpRequestDuration: promauto.NewHistogramVec(
+            prometheus.HistogramOpts{
+                Name:    "http_request_duration_seconds",
+                Help:    "HTTP request duration in seconds",
+                Buckets: prometheus.DefBuckets,
+            },
+            []string{"method", "endpoint"},
+        ),
+        
+        httpRequestSize: promauto.NewHistogramVec(
+            prometheus.HistogramOpts{
+                Name:    "http_request_size_bytes",
+                Help:    "HTTP request size in bytes",
+                Buckets: prometheus.ExponentialBuckets(100, 10, 8),
+            },
+            []string{"method", "endpoint"},
+        ),
+        
+        httpResponseSize: promauto.NewHistogramVec(
+            prometheus.HistogramOpts{
+                Name:    "http_response_size_bytes",
+                Help:    "HTTP response size in bytes",
+                Buckets: prometheus.ExponentialBuckets(100, 10, 8),
+            },
+            []string{"method", "endpoint"},
+        ),
+        
+        dbConnectionsActive: promauto.NewGauge(
+            prometheus.GaugeOpts{
+                Name: "db_connections_active",
+                Help: "Number of active database connections",
+            },
+        ),
+        
+        dbConnectionsIdle: promauto.NewGauge(
+            prometheus.GaugeOpts{
+                Name: "db_connections_idle",
+                Help: "Number of idle database connections",
+            },
+        ),
+        
+        dbQueriesTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "db_queries_total",
+                Help: "Total number of database queries",
+            },
+            []string{"operation", "table"},
+        ),
+        
+        dbQueryDuration: promauto.NewHistogramVec(
+            prometheus.HistogramOpts{
+                Name:    "db_query_duration_seconds",
+                Help:    "Database query duration in seconds",
+                Buckets: prometheus.DefBuckets,
+            },
+            []string{"operation", "table"},
+        ),
+        
+        cacheHitsTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "cache_hits_total",
+                Help: "Total number of cache hits",
+            },
+            []string{"cache_name"},
+        ),
+        
+        cacheMissesTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "cache_misses_total",
+                Help: "Total number of cache misses",
+            },
+            []string{"cache_name"},
+        ),
+        
+        cacheOperationsTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "cache_operations_total",
+                Help: "Total number of cache operations",
+            },
+            []string{"operation", "cache_name"},
+        ),
+        
+        usersTotal: promauto.NewGauge(
+            prometheus.GaugeOpts{
+                Name: "users_total",
+                Help: "Total number of users",
+            },
+        ),
+        
+        ordersTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "orders_total",
+                Help: "Total number of orders",
+            },
+            []string{"status"},
+        ),
+        
+        revenueTotal: promauto.NewCounterVec(
+            prometheus.CounterOpts{
+                Name: "revenue_total",
+                Help: "Total revenue",
+            },
+            []string{"currency"},
+        ),
+    }
+}
+
+func (m *Metrics) RecordHTTPRequest(method, endpoint, statusCode string, duration time.Duration, requestSize, responseSize int64) {
+    m.httpRequestsTotal.WithLabelValues(method, endpoint, statusCode).Inc()
+    m.httpRequestDuration.WithLabelValues(method, endpoint).Observe(duration.Seconds())
+    m.httpRequestSize.WithLabelValues(method, endpoint).Observe(float64(requestSize))
+    m.httpResponseSize.WithLabelValues(method, endpoint).Observe(float64(responseSize))
+}
+
+func (m *Metrics) RecordDatabaseQuery(operation, table string, duration time.Duration) {
+    m.dbQueriesTotal.WithLabelValues(operation, table).Inc()
+    m.dbQueryDuration.WithLabelValues(operation, table).Observe(duration.Seconds())
+}
+
+func (m *Metrics) RecordCacheHit(cacheName string) {
+    m.cacheHitsTotal.WithLabelValues(cacheName).Inc()
+}
+
+func (m *Metrics) RecordCacheMiss(cacheName string) {
+    m.cacheMissesTotal.WithLabelValues(cacheName).Inc()
+}
+
+func (m *Metrics) RecordCacheOperation(operation, cacheName string) {
+    m.cacheOperationsTotal.WithLabelValues(operation, cacheName).Inc()
+}
+
+func (m *Metrics) SetUsersTotal(count int64) {
+    m.usersTotal.Set(float64(count))
+}
+
+func (m *Metrics) RecordOrder(status string) {
+    m.ordersTotal.WithLabelValues(status).Inc()
+}
+
+func (m *Metrics) RecordRevenue(currency string, amount float64) {
+    m.revenueTotal.WithLabelValues(currency).Add(amount)
+}
+
+func (m *Metrics) UpdateDatabaseConnections(active, idle int) {
+    m.dbConnectionsActive.Set(float64(active))
+    m.dbConnectionsIdle.Set(float64(idle))
+}
+```
+
+### Metrics Middleware
+
+```go
+// pkg/monitoring/metrics_middleware.go
+package monitoring
+
+import (
+    "time"
+    "github.com/gofiber/fiber/v2"
+    "strconv"
+)
+
+func MetricsMiddleware(metrics *Metrics) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        start := time.Now()
+        requestSize := int64(len(c.Body()))
+        
+        err := c.Next()
+        
+        duration := time.Since(start)
+        statusCode := strconv.Itoa(c.Response().StatusCode())
+        responseSize := int64(len(c.Response().Body()))
+        
+        metrics.RecordHTTPRequest(
+            c.Method(),
+            c.Path(),
+            statusCode,
+            duration,
+            requestSize,
+            responseSize,
+        )
+        
+        return err
+    }
+}
+
+func MetricsHandler() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        // Serve Prometheus metrics
+        promhttp.Handler().ServeHTTP(c.Response().BodyWriter(), c.Request())
+        return nil
+    }
+}
+```
+
+## OpenTelemetry Integration
+
+### Tracing Setup
+
+```go
+// pkg/monitoring/tracing.go
+package monitoring
+
+import (
+    "context"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/jaeger"
+    "go.opentelemetry.io/otel/sdk/resource"
+    "go.opentelemetry.io/otel/sdk/trace"
+    semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+    "go.opentelemetry.io/otel/trace"
+)
+
+type TracingConfig struct {
+    ServiceName    string
+    ServiceVersion string
+    JaegerEndpoint string
+    Environment    string
+}
+
+func SetupTracing(config TracingConfig) (*trace.TracerProvider, error) {
+    // Create Jaeger exporter
+    exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(config.JaegerEndpoint)))
+    if err != nil {
+        return nil, err
+    }
+    
+    // Create resource
+    res, err := resource.New(context.Background(),
+        resource.WithAttributes(
+            semconv.ServiceNameKey.String(config.ServiceName),
+            semconv.ServiceVersionKey.String(config.ServiceVersion),
+            semconv.DeploymentEnvironmentKey.String(config.Environment),
+        ),
+    )
+    if err != nil {
+        return nil, err
+    }
+    
+    // Create tracer provider
+    tp := trace.NewTracerProvider(
+        trace.WithBatcher(exp),
+        trace.WithResource(res),
+    )
+    
+    // Set global tracer provider
+    otel.SetTracerProvider(tp)
+    
+    return tp, nil
+}
+
+func GetTracer(name string) trace.Tracer {
+    return otel.Tracer(name)
+}
+
+// HTTP tracing middleware
+func TracingMiddleware(serviceName string) fiber.Handler {
+    tracer := GetTracer(serviceName)
+    
+    return func(c *fiber.Ctx) error {
+        ctx, span := tracer.Start(c.Context(), c.Method()+" "+c.Path())
+        defer span.End()
+        
+        // Add attributes
+        span.SetAttributes(
+            semconv.HTTPMethodKey.String(c.Method()),
+            semconv.HTTPURLKey.String(c.OriginalURL()),
+            semconv.HTTPUserAgentKey.String(c.Get("User-Agent")),
+        )
+        
+        // Set context
+        c.SetUserContext(ctx)
+        
+        err := c.Next()
+        
+        // Add response attributes
+        span.SetAttributes(
+            semconv.HTTPStatusCodeKey.Int(c.Response().StatusCode()),
+        )
+        
+        if err != nil {
+            span.RecordError(err)
+        }
+        
+        return err
+    }
+}
+
+// Database tracing
+func TraceDatabaseQuery(ctx context.Context, operation, table string, query func() error) error {
+    tracer := GetTracer("database")
+    ctx, span := tracer.Start(ctx, "db."+operation)
+    defer span.End()
+    
+    span.SetAttributes(
+        semconv.DBOperationKey.String(operation),
+        semconv.DBSQLTableKey.String(table),
+    )
+    
+    err := query()
+    if err != nil {
+        span.RecordError(err)
+    }
+    
+    return err
+}
+```
+
+## Sentry Integration
+
+### Error Tracking
+
+```go
+// pkg/monitoring/sentry.go
+package monitoring
+
+import (
+    "github.com/getsentry/sentry-go"
+    "github.com/gofiber/fiber/v2"
+    "time"
+)
+
+type SentryConfig struct {
+    DSN              string
+    Environment      string
+    Release          string
+    Debug            bool
+    TracesSampleRate float64
+}
+
+func SetupSentry(config SentryConfig) error {
+    return sentry.Init(sentry.ClientOptions{
+        DSN:              config.DSN,
+        Environment:      config.Environment,
+        Release:          config.Release,
+        Debug:            config.Debug,
+        TracesSampleRate: config.TracesSampleRate,
+    })
+}
+
+func SentryMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        // Set user context
+        if userID := c.Locals("user_id"); userID != nil {
+            sentry.ConfigureScope(func(scope *sentry.Scope) {
+                scope.SetUser(sentry.User{
+                    ID: userID.(string),
+                })
+            })
+        }
+        
+        // Set request context
+        sentry.ConfigureScope(func(scope *sentry.Scope) {
+            scope.SetTag("request_id", c.Locals("request_id"))
+            scope.SetContext("request", map[string]interface{}{
+                "method": c.Method(),
+                "url":    c.OriginalURL(),
+                "headers": c.GetReqHeaders(),
+            })
+        })
+        
+        err := c.Next()
+        
+        // Capture errors
+        if err != nil {
+            sentry.CaptureException(err)
+        }
+        
+        return err
+    }
+}
+
+func CaptureError(err error, tags map[string]string) {
+    sentry.WithScope(func(scope *sentry.Scope) {
+        for key, value := range tags {
+            scope.SetTag(key, value)
+        }
+        sentry.CaptureException(err)
+    })
+}
+
+func CaptureMessage(message string, level sentry.Level, tags map[string]string) {
+    sentry.WithScope(func(scope *sentry.Scope) {
+        for key, value := range tags {
+            scope.SetTag(key, value)
+        }
+        sentry.CaptureMessage(message)
+    })
+}
+```
+
+## System Monitoring
+
+### System Metrics
+
+```go
+// pkg/monitoring/system.go
+package monitoring
+
+import (
+    "runtime"
+    "time"
+    "github.com/shirou/gopsutil/v3/cpu"
+    "github.com/shirou/gopsutil/v3/mem"
+    "github.com/shirou/gopsutil/v3/disk"
+    "github.com/shirou/gopsutil/v3/load"
+)
+
+type SystemMetrics struct {
+    CPU        CPUInfo        `json:"cpu"`
+    Memory     MemoryInfo     `json:"memory"`
+    Disk       DiskInfo       `json:"disk"`
+    Load       LoadInfo       `json:"load"`
+    GoRoutines int            `json:"goroutines"`
+    Timestamp  time.Time      `json:"timestamp"`
+}
+
+type CPUInfo struct {
+    Usage    float64 `json:"usage"`
+    Cores    int     `json:"cores"`
+    Model    string  `json:"model"`
+}
+
+type MemoryInfo struct {
+    Total       uint64  `json:"total"`
+    Available   uint64  `json:"available"`
+    Used        uint64  `json:"used"`
+    Free        uint64  `json:"free"`
+    Usage       float64 `json:"usage"`
+}
+
+type DiskInfo struct {
+    Total       uint64  `json:"total"`
+    Free        uint64  `json:"free"`
+    Used        uint64  `json:"used"`
+    Usage       float64 `json:"usage"`
+}
+
+type LoadInfo struct {
+    Load1  float64 `json:"load1"`
+    Load5  float64 `json:"load5"`
+    Load15 float64 `json:"load15"`
+}
+
+func GetSystemMetrics() (*SystemMetrics, error) {
+    // CPU info
+    cpuUsage, err := cpu.Percent(time.Second, false)
+    if err != nil {
+        return nil, err
+    }
+    
+    cpuInfo, err := cpu.Info()
+    if err != nil {
+        return nil, err
+    }
+    
+    // Memory info
+    memInfo, err := mem.VirtualMemory()
+    if err != nil {
+        return nil, err
+    }
+    
+    // Disk info
+    diskInfo, err := disk.Usage("/")
+    if err != nil {
+        return nil, err
+    }
+    
+    // Load info
+    loadInfo, err := load.Avg()
+    if err != nil {
+        return nil, err
+    }
+    
+    return &SystemMetrics{
+        CPU: CPUInfo{
+            Usage: cpuUsage[0],
+            Cores: len(cpuInfo),
+            Model: cpuInfo[0].ModelName,
+        },
+        Memory: MemoryInfo{
+            Total:     memInfo.Total,
+            Available: memInfo.Available,
+            Used:      memInfo.Used,
+            Free:      memInfo.Free,
+            Usage:     memInfo.UsedPercent,
+        },
+        Disk: DiskInfo{
+            Total: diskInfo.Total,
+            Free:  diskInfo.Free,
+            Used:  diskInfo.Used,
+            Usage: diskInfo.UsedPercent,
+        },
+        Load: LoadInfo{
+            Load1:  loadInfo.Load1,
+            Load5:  loadInfo.Load5,
+            Load15: loadInfo.Load15,
+        },
+        GoRoutines: runtime.NumGoroutine(),
+        Timestamp:  time.Now(),
+    }, nil
+}
+
+func SystemMetricsHandler() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        metrics, err := GetSystemMetrics()
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+        }
+        
+        return c.JSON(metrics)
+    }
+}
+```
+
+## Logging
+
+### Structured Logging
+
+```go
+// pkg/monitoring/logger.go
+package monitoring
+
+import (
+    "os"
+    "time"
+    "github.com/sirupsen/logrus"
+    "github.com/gofiber/fiber/v2"
+)
+
+type Logger struct {
+    *logrus.Logger
+}
+
+func NewLogger(level string) *Logger {
+    logger := logrus.New()
+    
+    // Set log level
+    logLevel, err := logrus.ParseLevel(level)
+    if err != nil {
+        logLevel = logrus.InfoLevel
+    }
+    logger.SetLevel(logLevel)
+    
+    // Set formatter
+    logger.SetFormatter(&logrus.JSONFormatter{
+        TimestampFormat: time.RFC3339,
+    })
+    
+    // Set output
+    logger.SetOutput(os.Stdout)
+    
+    return &Logger{Logger: logger}
+}
+
+func (l *Logger) WithRequest(c *fiber.Ctx) *logrus.Entry {
+    return l.WithFields(logrus.Fields{
+        "request_id": c.Locals("request_id"),
+        "method":     c.Method(),
+        "path":       c.Path(),
+        "ip":         c.IP(),
+        "user_agent": c.Get("User-Agent"),
+    })
+}
+
+func (l *Logger) WithUser(userID string) *logrus.Entry {
+    return l.WithField("user_id", userID)
+}
+
+func (l *Logger) WithError(err error) *logrus.Entry {
+    return l.WithError(err)
+}
+
+// Logging middleware
+func LoggingMiddleware(logger *Logger) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        start := time.Now()
+        
+        err := c.Next()
+        
+        duration := time.Since(start)
+        
+        entry := logger.WithRequest(c).WithFields(logrus.Fields{
+            "status_code": c.Response().StatusCode(),
+            "duration":    duration.String(),
+            "duration_ms": duration.Milliseconds(),
+        })
+        
+        if err != nil {
+            entry.WithError(err).Error("Request failed")
+        } else {
+            entry.Info("Request completed")
+        }
+        
+        return err
+    }
+}
+```
+
+## Application Setup
+
+### Complete Monitoring Setup
+
+```go
+// main.go
+package main
+
+import (
+    "log"
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/monitoring"
+    "my-app/routes"
+)
+
+func main() {
+    app := fiber.New()
+    
+    // Setup monitoring
+    metrics := monitoring.NewMetrics()
+    logger := monitoring.NewLogger("info")
+    
+    // Setup health checks
+    healthChecker := monitoring.NewHealthChecker(db, cache)
+    advancedHealthChecker := monitoring.NewAdvancedHealthChecker(30 * time.Second)
+    advancedHealthChecker.RegisterCheck("database", monitoring.DatabaseHealthCheck(db))
+    advancedHealthChecker.RegisterCheck("cache", monitoring.CacheHealthCheck(cache))
+    advancedHealthChecker.RegisterCheck("redis", monitoring.RedisHealthCheck(redis))
+    
+    // Setup tracing
+    tp, err := monitoring.SetupTracing(monitoring.TracingConfig{
+        ServiceName:    "my-app",
+        ServiceVersion: "1.0.0",
+        JaegerEndpoint: "http://localhost:14268/api/traces",
+        Environment:    "production",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer tp.Shutdown(context.Background())
+    
+    // Setup Sentry
+    err = monitoring.SetupSentry(monitoring.SentryConfig{
+        DSN:              "https://your-dsn@sentry.io/project",
+        Environment:      "production",
+        Release:          "1.0.0",
+        Debug:            false,
+        TracesSampleRate: 0.1,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Add middleware
+    app.Use(monitoring.LoggingMiddleware(logger))
+    app.Use(monitoring.MetricsMiddleware(metrics))
+    app.Use(monitoring.TracingMiddleware("my-app"))
+    app.Use(monitoring.SentryMiddleware())
+    
+    // Health check routes
+    app.Get("/health", healthChecker.HealthCheck)
+    app.Get("/livez", healthChecker.LivenessCheck)
+    app.Get("/readyz", healthChecker.ReadinessCheck)
+    
+    // Metrics route
+    app.Get("/metrics", monitoring.MetricsHandler())
+    
+    // System metrics route
+    app.Get("/system", monitoring.SystemMetricsHandler())
+    
+    // Setup application routes
+    routes.SetupAPIRoutes(app)
+    routes.SetupWebRoutes(app)
+    
+    log.Fatal(app.Listen(":3000"))
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Monitoring Configuration
+MONITORING_ENABLED=true
+LOG_LEVEL=info
+METRICS_ENABLED=true
+TRACING_ENABLED=true
+SENTRY_ENABLED=true
+
+# Health Check Configuration
+HEALTH_CHECK_TIMEOUT=30s
+HEALTH_CHECK_INTERVAL=10s
+
+# Prometheus Configuration
+PROMETHEUS_ENABLED=true
+PROMETHEUS_PORT=9090
+
+# Jaeger Configuration
+JAEGER_ENDPOINT=http://localhost:14268/api/traces
+JAEGER_SERVICE_NAME=my-app
+JAEGER_SERVICE_VERSION=1.0.0
+
+# Sentry Configuration
+SENTRY_DSN=https://your-dsn@sentry.io/project
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=1.0.0
+SENTRY_DEBUG=false
+SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+## Best Practices
+
+### 1. **Health Checks**
+- Implement comprehensive health checks
+- Use appropriate HTTP status codes
+- Check all critical dependencies
+- Provide detailed error information
+
+### 2. **Metrics**
+- Use meaningful metric names
+- Include relevant labels
+- Avoid high cardinality labels
+- Set appropriate bucket sizes
+
+### 3. **Tracing**
+- Trace all external calls
+- Use consistent span names
+- Add relevant attributes
+- Implement proper error handling
+
+### 4. **Logging**
+- Use structured logging
+- Include correlation IDs
+- Log at appropriate levels
+- Avoid logging sensitive data
+
+### 5. **Alerting**
+- Set up meaningful alerts
+- Use appropriate thresholds
+- Include runbook information
+- Test alerting regularly
+
+## Next Steps
+
+- [Deployment](/docs/deployment/production)
+- [Docker Configuration](/docs/deployment/docker)
+- [Kubernetes](/docs/deployment/kubernetes)
+- [Performance Optimization](/docs/core/performance)

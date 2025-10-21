@@ -1,0 +1,566 @@
+---
+title: "Configuration Management"
+description: "Learn how to configure your Mithril application"
+---
+
+# Configuration Management
+
+Mithril provides a powerful, environment-based configuration system that makes it easy to manage settings across different environments.
+
+## Environment Variables
+
+Mithril uses environment variables for configuration. Create a `.env` file in your project root:
+
+```bash
+# Application Configuration
+APP_NAME="My Awesome App"
+APP_ENV=development
+APP_DEBUG=true
+APP_HOST=localhost
+APP_PORT=3000
+APP_TIMEZONE=UTC
+
+# Database Configuration
+DB_DRIVER=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=my_awesome_app
+DB_USER=postgres
+DB_PASSWORD=password
+DB_SSL_MODE=disable
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-32-characters-long
+JWT_ACCESS_TOKEN_EXPIRY=15m
+JWT_REFRESH_TOKEN_EXPIRY=7d
+JWT_ALGORITHM=HS256
+
+# Mail Configuration
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="My App"
+
+# Storage Configuration
+STORAGE_DRIVER=local
+STORAGE_S3_BUCKET=my-bucket
+STORAGE_S3_REGION=us-east-1
+STORAGE_S3_ACCESS_KEY=your-access-key
+STORAGE_S3_SECRET_KEY=your-secret-key
+
+# Queue Configuration
+QUEUE_DRIVER=redis
+QUEUE_REDIS_HOST=localhost
+QUEUE_REDIS_PORT=6379
+QUEUE_REDIS_PASSWORD=
+QUEUE_REDIS_DB=0
+
+# Cache Configuration
+CACHE_DRIVER=redis
+CACHE_REDIS_HOST=localhost
+CACHE_REDIS_PORT=6379
+CACHE_REDIS_PASSWORD=
+CACHE_REDIS_DB=1
+
+# Session Configuration
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=
+SESSION_SECURE=false
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=lax
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Content-Type,Authorization,X-Requested-With
+CORS_EXPOSED_HEADERS=
+CORS_MAX_AGE=86400
+CORS_ALLOW_CREDENTIALS=true
+
+# Rate Limiting Configuration
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MINUTES=15
+RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS=false
+RATE_LIMIT_SKIP_FAILED_REQUESTS=false
+```
+
+## Configuration Files
+
+### Application Configuration
+
+```go
+// config/app.go
+package config
+
+import (
+    "time"
+)
+
+type AppConfig struct {
+    Name        string        `env:"APP_NAME" default:"Mithril App"`
+    Environment string        `env:"APP_ENV" default:"development"`
+    Debug       bool          `env:"APP_DEBUG" default:"false"`
+    Host        string        `env:"APP_HOST" default:"localhost"`
+    Port        int           `env:"APP_PORT" default:"3000"`
+    Timezone    string        `env:"APP_TIMEZONE" default:"UTC"`
+    URL         string        `env:"APP_URL" default:"http://localhost:3000"`
+    Key         string        `env:"APP_KEY" required:"true"`
+    Locale      string        `env:"APP_LOCALE" default:"en"`
+    FallbackLocale string     `env:"APP_FALLBACK_LOCALE" default:"en"`
+}
+
+func (c *AppConfig) IsDevelopment() bool {
+    return c.Environment == "development"
+}
+
+func (c *AppConfig) IsProduction() bool {
+    return c.Environment == "production"
+}
+
+func (c *AppConfig) IsStaging() bool {
+    return c.Environment == "staging"
+}
+
+func (c *AppConfig) IsTesting() bool {
+    return c.Environment == "testing"
+}
+
+func (c *AppConfig) GetAddress() string {
+    return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+```
+
+### Database Configuration
+
+```go
+// config/database.go
+package config
+
+type DatabaseConfig struct {
+    Driver   string `env:"DB_DRIVER" default:"postgres"`
+    Host     string `env:"DB_HOST" default:"localhost"`
+    Port     int    `env:"DB_PORT" default:"5432"`
+    Name     string `env:"DB_NAME" required:"true"`
+    User     string `env:"DB_USER" required:"true"`
+    Password string `env:"DB_PASSWORD" required:"true"`
+    SSLMode  string `env:"DB_SSL_MODE" default:"disable"`
+    Timezone string `env:"DB_TIMEZONE" default:"UTC"`
+    Charset  string `env:"DB_CHARSET" default:"utf8mb4"`
+    MaxOpenConns int `env:"DB_MAX_OPEN_CONNS" default:"25"`
+    MaxIdleConns int `env:"DB_MAX_IDLE_CONNS" default:"25"`
+    ConnMaxLifetime time.Duration `env:"DB_CONN_MAX_LIFETIME" default:"5m"`
+}
+
+func (c *DatabaseConfig) GetDSN() string {
+    switch c.Driver {
+    case "postgres":
+        return c.getPostgreSQLDSN()
+    case "mysql":
+        return c.getMySQLDSN()
+    case "sqlite":
+        return c.Name
+    default:
+        return c.getPostgreSQLDSN()
+    }
+}
+
+func (c *DatabaseConfig) getPostgreSQLDSN() string {
+    return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=%s",
+        c.Host, c.Port, c.User, c.Password, c.Name, c.SSLMode, c.Timezone)
+}
+
+func (c *DatabaseConfig) getMySQLDSN() string {
+    return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s",
+        c.User, c.Password, c.Host, c.Port, c.Name, c.Charset, c.Timezone)
+}
+```
+
+### JWT Configuration
+
+```go
+// config/jwt.go
+package config
+
+import "time"
+
+type JWTConfig struct {
+    Secret             string        `env:"JWT_SECRET" required:"true"`
+    AccessTokenExpiry  time.Duration `env:"JWT_ACCESS_TOKEN_EXPIRY" default:"15m"`
+    RefreshTokenExpiry time.Duration `env:"JWT_REFRESH_TOKEN_EXPIRY" default:"7d"`
+    Algorithm          string        `env:"JWT_ALGORITHM" default:"HS256"`
+    Issuer             string        `env:"JWT_ISSUER" default:"mithril"`
+    Audience           string        `env:"JWT_AUDIENCE" default:"mithril-users"`
+}
+```
+
+### Mail Configuration
+
+```go
+// config/mail.go
+package config
+
+type MailConfig struct {
+    Driver     string `env:"MAIL_DRIVER" default:"smtp"`
+    Host       string `env:"MAIL_HOST" default:"localhost"`
+    Port       int    `env:"MAIL_PORT" default:"587"`
+    Username   string `env:"MAIL_USERNAME"`
+    Password   string `env:"MAIL_PASSWORD"`
+    Encryption string `env:"MAIL_ENCRYPTION" default:"tls"`
+    FromAddress string `env:"MAIL_FROM_ADDRESS" required:"true"`
+    FromName   string `env:"MAIL_FROM_NAME" required:"true"`
+    Queue      bool   `env:"MAIL_QUEUE" default:"false"`
+    RetryAfter int    `env:"MAIL_RETRY_AFTER" default:"5"`
+}
+```
+
+## Configuration Manager
+
+The configuration manager handles loading and validating configuration:
+
+```go
+// pkg/config/manager.go
+package config
+
+import (
+    "os"
+    "reflect"
+    "strconv"
+    "time"
+    "github.com/joho/godotenv"
+)
+
+type Manager struct {
+    configs map[string]interface{}
+}
+
+func NewManagerFromEnv() *Manager {
+    // Load .env file
+    godotenv.Load()
+    
+    manager := &Manager{
+        configs: make(map[string]interface{}),
+    }
+    
+    return manager
+}
+
+func (m *Manager) RegisterConfig(name string, config interface{}) error {
+    // Load configuration from environment
+    if err := m.loadConfig(config); err != nil {
+        return err
+    }
+    
+    m.configs[name] = config
+    return nil
+}
+
+func (m *Manager) GetConfig(name string) interface{} {
+    return m.configs[name]
+}
+
+func (m *Manager) loadConfig(config interface{}) error {
+    v := reflect.ValueOf(config).Elem()
+    t := reflect.TypeOf(config).Elem()
+    
+    for i := 0; i < v.NumField(); i++ {
+        field := v.Field(i)
+        fieldType := t.Field(i)
+        
+        // Get environment variable name
+        envKey := fieldType.Tag.Get("env")
+        if envKey == "" {
+            continue
+        }
+        
+        // Get environment value
+        envValue := os.Getenv(envKey)
+        
+        // Set field value
+        if err := m.setFieldValue(field, envValue, fieldType); err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+
+func (m *Manager) setFieldValue(field reflect.Value, value string, fieldType reflect.StructField) error {
+    if value == "" {
+        // Use default value if available
+        defaultValue := fieldType.Tag.Get("default")
+        if defaultValue != "" {
+            value = defaultValue
+        } else if fieldType.Tag.Get("required") == "true" {
+            return fmt.Errorf("required environment variable %s is not set", fieldType.Tag.Get("env"))
+        } else {
+            return nil
+        }
+    }
+    
+    switch field.Kind() {
+    case reflect.String:
+        field.SetString(value)
+    case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+        if field.Type() == reflect.TypeOf(time.Duration(0)) {
+            duration, err := m.parseDuration(value)
+            if err != nil {
+                return err
+            }
+            field.Set(reflect.ValueOf(duration))
+        } else {
+            intValue, err := strconv.ParseInt(value, 10, 64)
+            if err != nil {
+                return err
+            }
+            field.SetInt(intValue)
+        }
+    case reflect.Bool:
+        boolValue, err := strconv.ParseBool(value)
+        if err != nil {
+            return err
+        }
+        field.SetBool(boolValue)
+    }
+    
+    return nil
+}
+
+func (m *Manager) parseDuration(value string) (time.Duration, error) {
+    // Support "d" for days and plain numbers as seconds
+    if value == "" {
+        return 0, nil
+    }
+    
+    // Handle days
+    if strings.HasSuffix(value, "d") {
+        days, err := strconv.Atoi(strings.TrimSuffix(value, "d"))
+        if err != nil {
+            return 0, err
+        }
+        return time.Duration(days) * 24 * time.Hour, nil
+    }
+    
+    // Handle plain numbers as seconds
+    if _, err := strconv.Atoi(value); err == nil {
+        seconds, _ := strconv.Atoi(value)
+        return time.Duration(seconds) * time.Second, nil
+    }
+    
+    // Use standard time.ParseDuration
+    return time.ParseDuration(value)
+}
+```
+
+## Using Configuration
+
+### In Your Application
+
+```go
+// main.go
+package main
+
+import (
+    "log"
+    "github.com/mithril-framework/mithril/pkg/core"
+    "my-app/config"
+)
+
+func main() {
+    // Initialize configuration manager
+    configManager := config.NewManagerFromEnv()
+    
+    // Register configurations
+    appConfig := &config.AppConfig{}
+    configManager.RegisterConfig("app", appConfig)
+    
+    dbConfig := &config.DatabaseConfig{}
+    configManager.RegisterConfig("database", dbConfig)
+    
+    jwtConfig := &config.JWTConfig{}
+    configManager.RegisterConfig("jwt", jwtConfig)
+    
+    // Create application with configuration
+    app := core.NewApplication(configManager)
+    
+    // Start server
+    log.Fatal(app.Listen(appConfig.GetAddress()))
+}
+```
+
+### In Controllers
+
+```go
+// app/controllers/user_controller.go
+package controllers
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/config"
+)
+
+type UserController struct {
+    config *config.AppConfig
+}
+
+func NewUserController(configManager *config.Manager) *UserController {
+    appConfig := configManager.GetConfig("app").(*config.AppConfig)
+    
+    return &UserController{
+        config: appConfig,
+    }
+}
+
+func (c *UserController) Index(ctx *fiber.Ctx) error {
+    return ctx.JSON(fiber.Map{
+        "app_name": c.config.Name,
+        "environment": c.config.Environment,
+        "debug": c.config.Debug,
+    })
+}
+```
+
+## Environment-Specific Configuration
+
+### Development Environment
+
+```bash
+# .env.development
+APP_ENV=development
+APP_DEBUG=true
+DB_HOST=localhost
+MAIL_DRIVER=log
+CACHE_DRIVER=memory
+```
+
+### Production Environment
+
+```bash
+# .env.production
+APP_ENV=production
+APP_DEBUG=false
+DB_HOST=prod-db.example.com
+MAIL_DRIVER=smtp
+CACHE_DRIVER=redis
+```
+
+### Testing Environment
+
+```bash
+# .env.testing
+APP_ENV=testing
+APP_DEBUG=true
+DB_NAME=myapp_test
+MAIL_DRIVER=array
+CACHE_DRIVER=memory
+```
+
+## Configuration Validation
+
+```go
+// pkg/config/validator.go
+package config
+
+import (
+    "fmt"
+    "reflect"
+)
+
+func ValidateConfig(config interface{}) error {
+    v := reflect.ValueOf(config).Elem()
+    t := reflect.TypeOf(config).Elem()
+    
+    for i := 0; i < v.NumField(); i++ {
+        field := v.Field(i)
+        fieldType := t.Field(i)
+        
+        // Check required fields
+        if fieldType.Tag.Get("required") == "true" {
+            if field.IsZero() {
+                return fmt.Errorf("required field %s is not set", fieldType.Name)
+            }
+        }
+        
+        // Validate field values
+        if err := validateField(field, fieldType); err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+
+func validateField(field reflect.Value, fieldType reflect.StructField) error {
+    switch field.Kind() {
+    case reflect.String:
+        value := field.String()
+        
+        // Check minimum length
+        if minLen := fieldType.Tag.Get("min"); minLen != "" {
+            if len(value) < parseMinLen(minLen) {
+                return fmt.Errorf("field %s must be at least %s characters", fieldType.Name, minLen)
+            }
+        }
+        
+        // Check maximum length
+        if maxLen := fieldType.Tag.Get("max"); maxLen != "" {
+            if len(value) > parseMaxLen(maxLen) {
+                return fmt.Errorf("field %s must be at most %s characters", fieldType.Name, maxLen)
+            }
+        }
+    }
+    
+    return nil
+}
+```
+
+## Configuration Caching
+
+```bash
+# Cache configuration for better performance
+go run . artisan config:cache
+
+# Clear configuration cache
+go run . artisan config:clear
+```
+
+## Best Practices
+
+### 1. **Use Environment Variables**
+- Never hardcode sensitive values
+- Use `.env` files for local development
+- Use environment variables in production
+
+### 2. **Provide Sensible Defaults**
+- Set default values for non-sensitive configuration
+- Make required fields explicit
+- Document all configuration options
+
+### 3. **Validate Configuration**
+- Validate configuration on startup
+- Provide clear error messages
+- Fail fast on invalid configuration
+
+### 4. **Environment-Specific Files**
+- Use different `.env` files for different environments
+- Keep sensitive data out of version control
+- Use configuration management tools in production
+
+### 5. **Security**
+- Never commit `.env` files
+- Use strong secrets for JWT and encryption
+- Rotate secrets regularly
+- Use environment-specific secrets
+
+## Next Steps
+
+- [Application Structure](/docs/core/application)
+- [Dependency Injection](/docs/core/container)
+- [Database Configuration](/docs/database/models)
+- [Authentication Configuration](/docs/authentication/jwt)

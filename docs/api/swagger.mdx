@@ -1,0 +1,774 @@
+---
+title: "Swagger Documentation"
+description: "Auto-generated OpenAPI 3.0 documentation with Swagger UI"
+---
+
+# Swagger Documentation
+
+Mithril automatically generates comprehensive OpenAPI 3.0 documentation for your APIs. The documentation is available at `/docs` (Swagger UI) and `/redoc` (ReDoc) endpoints.
+
+## Automatic Documentation Generation
+
+### OpenAPI Specification
+
+Mithril automatically generates OpenAPI 3.0 specifications based on your route definitions, request/response schemas, and validation rules.
+
+```go
+// pkg/swagger/generator.go
+package swagger
+
+import (
+    "encoding/json"
+    "github.com/gofiber/fiber/v2"
+    "github.com/swaggo/swag"
+)
+
+type OpenAPISpec struct {
+    OpenAPI string                 `json:"openapi"`
+    Info    Info                   `json:"info"`
+    Servers []Server               `json:"servers"`
+    Paths   map[string]PathItem    `json:"paths"`
+    Components Components          `json:"components"`
+}
+
+type Info struct {
+    Title       string `json:"title"`
+    Description string `json:"description"`
+    Version     string `json:"version"`
+    Contact     Contact `json:"contact,omitempty"`
+    License     License `json:"license,omitempty"`
+}
+
+type Contact struct {
+    Name  string `json:"name,omitempty"`
+    URL   string `json:"url,omitempty"`
+    Email string `json:"email,omitempty"`
+}
+
+type License struct {
+    Name string `json:"name"`
+    URL  string `json:"url,omitempty"`
+}
+
+type Server struct {
+    URL         string `json:"url"`
+    Description string `json:"description,omitempty"`
+}
+
+type PathItem struct {
+    Get    *Operation `json:"get,omitempty"`
+    Post   *Operation `json:"post,omitempty"`
+    Put    *Operation `json:"put,omitempty"`
+    Delete *Operation `json:"delete,omitempty"`
+    Patch  *Operation `json:"patch,omitempty"`
+}
+
+type Operation struct {
+    Tags        []string              `json:"tags,omitempty"`
+    Summary     string                `json:"summary,omitempty"`
+    Description string                `json:"description,omitempty"`
+    OperationID string                `json:"operationId,omitempty"`
+    Parameters  []Parameter           `json:"parameters,omitempty"`
+    RequestBody *RequestBody          `json:"requestBody,omitempty"`
+    Responses   map[string]Response   `json:"responses"`
+    Security    []SecurityRequirement `json:"security,omitempty"`
+}
+
+type Parameter struct {
+    Name        string  `json:"name"`
+    In          string  `json:"in"`
+    Description string  `json:"description,omitempty"`
+    Required    bool    `json:"required,omitempty"`
+    Schema      *Schema `json:"schema,omitempty"`
+    Example     interface{} `json:"example,omitempty"`
+}
+
+type RequestBody struct {
+    Description string                `json:"description,omitempty"`
+    Content     map[string]MediaType  `json:"content"`
+    Required    bool                  `json:"required,omitempty"`
+}
+
+type Response struct {
+    Description string                `json:"description"`
+    Content     map[string]MediaType  `json:"content,omitempty"`
+    Headers     map[string]Header     `json:"headers,omitempty"`
+}
+
+type MediaType struct {
+    Schema *Schema `json:"schema,omitempty"`
+}
+
+type Schema struct {
+    Type        string                 `json:"type,omitempty"`
+    Format      string                 `json:"format,omitempty"`
+    Description string                 `json:"description,omitempty"`
+    Example     interface{}            `json:"example,omitempty"`
+    Properties  map[string]*Schema     `json:"properties,omitempty"`
+    Required    []string               `json:"required,omitempty"`
+    Items       *Schema                `json:"items,omitempty"`
+    Enum        []interface{}          `json:"enum,omitempty"`
+    MinLength   int                    `json:"minLength,omitempty"`
+    MaxLength   int                    `json:"maxLength,omitempty"`
+    Minimum     *float64               `json:"minimum,omitempty"`
+    Maximum     *float64               `json:"maximum,omitempty"`
+    Pattern     string                 `json:"pattern,omitempty"`
+}
+
+type Header struct {
+    Description string  `json:"description,omitempty"`
+    Schema      *Schema `json:"schema,omitempty"`
+}
+
+type SecurityRequirement map[string][]string
+
+type Components struct {
+    Schemas         map[string]*Schema         `json:"schemas,omitempty"`
+    SecuritySchemes map[string]SecurityScheme  `json:"securitySchemes,omitempty"`
+}
+
+type SecurityScheme struct {
+    Type        string `json:"type"`
+    Description string `json:"description,omitempty"`
+    Name        string `json:"name,omitempty"`
+    In          string `json:"in,omitempty"`
+    Scheme      string `json:"scheme,omitempty"`
+    BearerFormat string `json:"bearerFormat,omitempty"`
+}
+```
+
+### Swagger Middleware
+
+```go
+// pkg/swagger/middleware.go
+package swagger
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2/middleware/filesystem"
+    "net/http"
+)
+
+func SwaggerUI() fiber.Handler {
+    return filesystem.New(filesystem.Config{
+        Root:   http.FS(swaggerUI),
+        Path:   "/docs",
+        Index:  "index.html",
+        Browse: true,
+    })
+}
+
+func ReDoc() fiber.Handler {
+    return filesystem.New(filesystem.Config{
+        Root:   http.FS(reDoc),
+        Path:   "/redoc",
+        Index:  "index.html",
+        Browse: true,
+    })
+}
+
+func OpenAPISpec() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        spec := generateOpenAPISpec()
+        return c.JSON(spec)
+    }
+}
+```
+
+## Schema Annotations
+
+### Request Schema Annotations
+
+```go
+// app/schemas/user_request.go
+package schemas
+
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email" example:"user@example.com" description:"User's email address"`
+    Password string `json:"password" validate:"required,min=8" example:"password123" description:"User's password (minimum 8 characters)"`
+    Name     string `json:"name" validate:"required,min=2,max=100" example:"John Doe" description:"User's full name"`
+    Age      int    `json:"age" validate:"min=18,max=120" example:"25" description:"User's age (must be between 18 and 120)"`
+}
+
+type UpdateUserRequest struct {
+    Name string `json:"name" validate:"omitempty,min=2,max=100" example:"John Doe" description:"User's full name"`
+    Age  int    `json:"age" validate:"omitempty,min=18,max=120" example:"25" description:"User's age"`
+}
+
+type LoginRequest struct {
+    Email    string `json:"email" validate:"required,email" example:"user@example.com" description:"User's email address"`
+    Password string `json:"password" validate:"required" example:"password123" description:"User's password"`
+}
+```
+
+### Response Schema Annotations
+
+```go
+// app/schemas/user_response.go
+package schemas
+
+import (
+    "time"
+    "github.com/google/uuid"
+)
+
+type UserResponse struct {
+    ID        uuid.UUID `json:"id" example:"123e4567-e89b-12d3-a456-426614174000" description:"Unique user identifier"`
+    Email     string    `json:"email" example:"user@example.com" description:"User's email address"`
+    Name      string    `json:"name" example:"John Doe" description:"User's full name"`
+    Age       int       `json:"age" example:"25" description:"User's age"`
+    CreatedAt time.Time `json:"created_at" example:"2024-01-01T00:00:00Z" description:"User creation timestamp"`
+    UpdatedAt time.Time `json:"updated_at" example:"2024-01-01T00:00:00Z" description:"User last update timestamp"`
+}
+
+type UserListResponse struct {
+    Data       []UserResponse `json:"data" description:"List of users"`
+    Pagination PaginationMeta `json:"pagination" description:"Pagination information"`
+}
+
+type PaginationMeta struct {
+    CurrentPage int   `json:"current_page" example:"1" description:"Current page number"`
+    PerPage     int   `json:"per_page" example:"15" description:"Number of items per page"`
+    Total       int64 `json:"total" example:"100" description:"Total number of items"`
+    LastPage    int   `json:"last_page" example:"7" description:"Last page number"`
+    From        int   `json:"from" example:"1" description:"First item number on current page"`
+    To          int   `json:"to" example:"15" description:"Last item number on current page"`
+}
+
+type ErrorResponse struct {
+    Error   string            `json:"error" example:"Validation failed" description:"Error type"`
+    Message string            `json:"message" example:"The given data was invalid" description:"Error message"`
+    Errors  map[string]string `json:"errors,omitempty" example:"email:['The email field is required']" description:"Field-specific validation errors"`
+}
+```
+
+## Route Documentation
+
+### Controller Documentation
+
+```go
+// app/controllers/user_controller.go
+package controllers
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/app/schemas"
+)
+
+// @Summary Create a new user
+// @Description Create a new user account with the provided information
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body schemas.CreateUserRequest true "User information"
+// @Success 201 {object} schemas.UserResponse "User created successfully"
+// @Failure 400 {object} schemas.ErrorResponse "Invalid request data"
+// @Failure 422 {object} schemas.ErrorResponse "Validation failed"
+// @Failure 500 {object} schemas.ErrorResponse "Internal server error"
+// @Router /api/users [post]
+func (c *UserController) Create(ctx *fiber.Ctx) error {
+    req := ctx.Locals("validated_data").(*schemas.CreateUserRequest)
+    
+    user, err := c.userService.Create(*req)
+    if err != nil {
+        return ctx.Status(400).JSON(schemas.ErrorResponse{
+            Error:   "Failed to create user",
+            Message: err.Error(),
+        })
+    }
+    
+    return ctx.Status(201).JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+
+// @Summary Get user by ID
+// @Description Retrieve a specific user by their ID
+// @Tags users
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {object} schemas.UserResponse "User found"
+// @Failure 404 {object} schemas.ErrorResponse "User not found"
+// @Failure 500 {object} schemas.ErrorResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/users/{id} [get]
+func (c *UserController) Show(ctx *fiber.Ctx) error {
+    id := ctx.Params("id")
+    
+    user, err := c.userService.GetByID(id)
+    if err != nil {
+        return ctx.Status(404).JSON(schemas.ErrorResponse{
+            Error:   "User not found",
+            Message: "The requested user does not exist",
+        })
+    }
+    
+    return ctx.JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+
+// @Summary List users
+// @Description Retrieve a paginated list of users
+// @Tags users
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param per_page query int false "Items per page" default(15)
+// @Param search query string false "Search term"
+// @Success 200 {object} schemas.UserListResponse "Users retrieved successfully"
+// @Failure 500 {object} schemas.ErrorResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/users [get]
+func (c *UserController) Index(ctx *fiber.Ctx) error {
+    page := ctx.QueryInt("page", 1)
+    perPage := ctx.QueryInt("per_page", 15)
+    search := ctx.Query("search")
+    
+    users, total, err := c.userService.GetPaginated(page, perPage, search)
+    if err != nil {
+        return ctx.Status(500).JSON(schemas.ErrorResponse{
+            Error:   "Failed to fetch users",
+            Message: err.Error(),
+        })
+    }
+    
+    var userResponses []schemas.UserResponse
+    for _, user := range users {
+        userResponses = append(userResponses, schemas.UserResponse{
+            ID:        user.ID,
+            Email:     user.Email,
+            Name:      user.Name,
+            Age:       user.Age,
+            CreatedAt: user.CreatedAt,
+            UpdatedAt: user.UpdatedAt,
+        })
+    }
+    
+    lastPage := int((total + int64(perPage) - 1) / int64(perPage))
+    pagination := schemas.PaginationMeta{
+        CurrentPage: page,
+        PerPage:     perPage,
+        Total:       total,
+        LastPage:    lastPage,
+        From:        (page-1)*perPage + 1,
+        To:          page * perPage,
+    }
+    
+    return ctx.JSON(schemas.UserListResponse{
+        Data:       userResponses,
+        Pagination: pagination,
+    })
+}
+
+// @Summary Update user
+// @Description Update an existing user's information
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param user body schemas.UpdateUserRequest true "Updated user information"
+// @Success 200 {object} schemas.UserResponse "User updated successfully"
+// @Failure 400 {object} schemas.ErrorResponse "Invalid request data"
+// @Failure 404 {object} schemas.ErrorResponse "User not found"
+// @Failure 422 {object} schemas.ErrorResponse "Validation failed"
+// @Security BearerAuth
+// @Router /api/users/{id} [put]
+func (c *UserController) Update(ctx *fiber.Ctx) error {
+    id := ctx.Params("id")
+    req := ctx.Locals("validated_data").(*schemas.UpdateUserRequest)
+    
+    user, err := c.userService.Update(id, *req)
+    if err != nil {
+        return ctx.Status(400).JSON(schemas.ErrorResponse{
+            Error:   "Failed to update user",
+            Message: err.Error(),
+        })
+    }
+    
+    return ctx.JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+
+// @Summary Delete user
+// @Description Delete a user account
+// @Tags users
+// @Param id path string true "User ID"
+// @Success 204 "User deleted successfully"
+// @Failure 404 {object} schemas.ErrorResponse "User not found"
+// @Failure 500 {object} schemas.ErrorResponse "Internal server error"
+// @Security BearerAuth
+// @Router /api/users/{id} [delete]
+func (c *UserController) Delete(ctx *fiber.Ctx) error {
+    id := ctx.Params("id")
+    
+    err := c.userService.Delete(id)
+    if err != nil {
+        return ctx.Status(404).JSON(schemas.ErrorResponse{
+            Error:   "User not found",
+            Message: "The requested user does not exist",
+        })
+    }
+    
+    return ctx.SendStatus(204)
+}
+```
+
+### Authentication Documentation
+
+```go
+// app/controllers/auth_controller.go
+package controllers
+
+// @Summary User login
+// @Description Authenticate user with email and password
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param credentials body schemas.LoginRequest true "Login credentials"
+// @Success 200 {object} schemas.LoginResponse "Login successful"
+// @Failure 401 {object} schemas.ErrorResponse "Invalid credentials"
+// @Failure 422 {object} schemas.ErrorResponse "Validation failed"
+// @Router /api/auth/login [post]
+func (c *AuthController) Login(ctx *fiber.Ctx) error {
+    req := ctx.Locals("validated_data").(*schemas.LoginRequest)
+    
+    user, token, err := c.authService.Login(req.Email, req.Password)
+    if err != nil {
+        return ctx.Status(401).JSON(schemas.ErrorResponse{
+            Error:   "Authentication failed",
+            Message: "Invalid email or password",
+        })
+    }
+    
+    return ctx.JSON(schemas.LoginResponse{
+        User: schemas.UserResponse{
+            ID:        user.ID,
+            Email:     user.Email,
+            Name:      user.Name,
+            Age:       user.Age,
+            CreatedAt: user.CreatedAt,
+            UpdatedAt: user.UpdatedAt,
+        },
+        Token: token,
+        Type:  "Bearer",
+    })
+}
+
+// @Summary User registration
+// @Description Register a new user account
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param user body schemas.CreateUserRequest true "User registration data"
+// @Success 201 {object} schemas.UserResponse "User registered successfully"
+// @Failure 400 {object} schemas.ErrorResponse "Invalid request data"
+// @Failure 422 {object} schemas.ErrorResponse "Validation failed"
+// @Router /api/auth/register [post]
+func (c *AuthController) Register(ctx *fiber.Ctx) error {
+    req := ctx.Locals("validated_data").(*schemas.CreateUserRequest)
+    
+    user, err := c.authService.Register(*req)
+    if err != nil {
+        return ctx.Status(400).JSON(schemas.ErrorResponse{
+            Error:   "Registration failed",
+            Message: err.Error(),
+        })
+    }
+    
+    return ctx.Status(201).JSON(schemas.UserResponse{
+        ID:        user.ID,
+        Email:     user.Email,
+        Name:      user.Name,
+        Age:       user.Age,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+    })
+}
+```
+
+## Security Documentation
+
+### JWT Authentication
+
+```go
+// pkg/swagger/security.go
+package swagger
+
+func GetSecuritySchemes() map[string]SecurityScheme {
+    return map[string]SecurityScheme{
+        "BearerAuth": {
+            Type:         "http",
+            Scheme:       "bearer",
+            BearerFormat: "JWT",
+            Description:  "JWT token authentication",
+        },
+        "ApiKeyAuth": {
+            Type:        "apiKey",
+            In:          "header",
+            Name:        "X-API-Key",
+            Description: "API key authentication",
+        },
+    }
+}
+```
+
+### Security Requirements
+
+```go
+// In your route definitions
+// @Security BearerAuth
+// @Security ApiKeyAuth
+```
+
+## Configuration
+
+### Swagger Configuration
+
+```go
+// pkg/swagger/config.go
+package swagger
+
+type Config struct {
+    Title       string
+    Description string
+    Version     string
+    Contact     Contact
+    License     License
+    Servers     []Server
+}
+
+func DefaultConfig() Config {
+    return Config{
+        Title:       "Mithril API",
+        Description: "A batteries-included web framework for Go",
+        Version:     "1.0.0",
+        Contact: Contact{
+            Name:  "Mithril Team",
+            Email: "support@mithril-framework.dev",
+            URL:   "https://mithril-framework.dev",
+        },
+        License: License{
+            Name: "MIT",
+            URL:  "https://opensource.org/licenses/MIT",
+        },
+        Servers: []Server{
+            {
+                URL:         "http://localhost:3000",
+                Description: "Development server",
+            },
+            {
+                URL:         "https://api.mithril-framework.dev",
+                Description: "Production server",
+            },
+        },
+    }
+}
+```
+
+### Environment Configuration
+
+```bash
+# Swagger Configuration
+SWAGGER_TITLE="My Awesome API"
+SWAGGER_DESCRIPTION="API for My Awesome Application"
+SWAGGER_VERSION="1.0.0"
+SWAGGER_CONTACT_NAME="API Team"
+SWAGGER_CONTACT_EMAIL="api@myapp.com"
+SWAGGER_CONTACT_URL="https://myapp.com"
+SWAGGER_LICENSE_NAME="MIT"
+SWAGGER_LICENSE_URL="https://opensource.org/licenses/MIT"
+```
+
+## Setup in Application
+
+### Main Application Setup
+
+```go
+// main.go
+package main
+
+import (
+    "log"
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/swagger"
+    "my-app/routes"
+)
+
+func main() {
+    app := fiber.New()
+    
+    // Setup Swagger documentation
+    app.Get("/docs/*", swagger.SwaggerUI())
+    app.Get("/redoc/*", swagger.ReDoc())
+    app.Get("/openapi.json", swagger.OpenAPISpec())
+    
+    // Setup routes
+    routes.SetupAPIRoutes(app)
+    routes.SetupWebRoutes(app)
+    
+    log.Fatal(app.Listen(":3000"))
+}
+```
+
+### Route Setup with Documentation
+
+```go
+// routes/api.go
+package routes
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/app/controllers"
+    "my-app/pkg/validation"
+    "my-app/app/schemas"
+)
+
+func SetupAPIRoutes(app *fiber.App) {
+    api := app.Group("/api")
+    
+    validator := validation.NewValidator()
+    userController := controllers.NewUserController(userService, validator)
+    authController := controllers.NewAuthController(authService, validator)
+    
+    // Public routes
+    api.Post("/auth/login",
+        validation.ValidateRequest[schemas.LoginRequest](validator),
+        authController.Login,
+    )
+    
+    api.Post("/auth/register",
+        validation.ValidateRequest[schemas.CreateUserRequest](validator),
+        authController.Register,
+    )
+    
+    // Protected routes
+    protected := api.Group("/", middleware.Auth())
+    
+    protected.Get("/users", userController.Index)
+    protected.Post("/users",
+        validation.ValidateRequest[schemas.CreateUserRequest](validator),
+        userController.Create,
+    )
+    protected.Get("/users/:id", userController.Show)
+    protected.Put("/users/:id",
+        validation.ValidateRequest[schemas.UpdateUserRequest](validator),
+        userController.Update,
+    )
+    protected.Delete("/users/:id", userController.Delete)
+}
+```
+
+## Customization
+
+### Custom Swagger UI Theme
+
+```go
+// pkg/swagger/custom_ui.go
+package swagger
+
+func CustomSwaggerUI() fiber.Handler {
+    return filesystem.New(filesystem.Config{
+        Root:   http.FS(customSwaggerUI),
+        Path:   "/docs",
+        Index:  "index.html",
+        Browse: true,
+    })
+}
+```
+
+### Custom OpenAPI Extensions
+
+```go
+// pkg/swagger/extensions.go
+package swagger
+
+func AddCustomExtensions(spec *OpenAPISpec) {
+    // Add custom extensions
+    spec.Info.Extensions = map[string]interface{}{
+        "x-logo": map[string]interface{}{
+            "url": "https://mithril-framework.dev/logo.png",
+        },
+        "x-tagGroups": []map[string]interface{}{
+            {
+                "name": "Authentication",
+                "tags": []string{"auth"},
+            },
+            {
+                "name": "User Management",
+                "tags": []string{"users"},
+            },
+        },
+    }
+}
+```
+
+## Testing Documentation
+
+### Generate Documentation
+
+```bash
+# Generate OpenAPI specification
+go run . artisan generate:swagger
+
+# Generate and serve documentation
+go run . artisan serve --docs
+```
+
+### Validate OpenAPI Spec
+
+```bash
+# Validate OpenAPI specification
+swagger-codegen validate -i openapi.json
+
+# Generate client SDKs
+swagger-codegen generate -i openapi.json -l go -o ./client
+```
+
+## Best Practices
+
+### 1. **Documentation Quality**
+- Provide clear descriptions for all endpoints
+- Include example values for all fields
+- Document all possible response codes
+- Use consistent naming conventions
+
+### 2. **Schema Design**
+- Use descriptive field names
+- Provide validation rules
+- Include example values
+- Group related fields in nested objects
+
+### 3. **Security Documentation**
+- Document authentication methods
+- Include security requirements
+- Provide example tokens
+- Document permission requirements
+
+### 4. **API Versioning**
+- Use versioned endpoints
+- Document breaking changes
+- Maintain backward compatibility
+- Provide migration guides
+
+## Next Steps
+
+- [Request/Response Validation](/docs/api/validation)
+- [Error Handling](/docs/api/error-handling)
+- [Authentication](/docs/authentication/jwt)
+- [Testing](/docs/contributing/testing)

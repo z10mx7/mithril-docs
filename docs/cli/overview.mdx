@@ -1,0 +1,520 @@
+---
+title: "CLI Overview"
+description: "Complete guide to Mithril's command-line interface"
+---
+
+# CLI Overview
+
+Mithril provides a powerful command-line interface inspired by Laravel's Artisan. The CLI consists of two parts:
+
+1. **Global CLI** (`mithril`) - For project creation and management
+2. **Local Artisan** (`go run . artisan`) - For project-specific operations
+
+## Global CLI Commands
+
+### Project Management
+
+#### Create New Project
+
+```bash
+# Create a new Mithril project
+mithril new my-awesome-app
+
+# Create with specific options
+mithril new my-api --api-only
+mithril new my-web --web-only
+mithril new my-minimal --minimal
+```
+
+**Options:**
+- `--api-only`: Create API-only project
+- `--web-only`: Create web-only project  
+- `--minimal`: Create minimal project structure
+
+#### Version Information
+
+```bash
+# Show version
+mithril --version
+
+# Show help
+mithril --help
+```
+
+## Local Artisan Commands
+
+All artisan commands are run from within your project directory:
+
+```bash
+# Navigate to your project
+cd my-awesome-app
+
+# Run artisan commands
+go run . artisan <command>
+```
+
+### Project Commands
+
+#### Module Management
+
+```bash
+# Create a new module
+go run . artisan make:module blog --full
+go run . artisan make:module api --api-only
+go run . artisan make:module cms --web-only
+
+# Options:
+# --full: Complete CRUD module (default)
+# --api-only: API routes only
+# --web-only: Web routes only
+```
+
+#### Code Generation
+
+```bash
+# Generate controllers
+go run . artisan make:controller UserController
+go run . artisan make:controller ProductController --resource
+go run . artisan make:controller ApiController --api
+
+# Generate models
+go run . artisan make:model User
+go run . artisan make:model Product --migration
+go run . artisan make:model Category --migration --seeder
+
+# Generate middleware
+go run . artisan make:middleware AuthMiddleware
+go run . artisan make:middleware CorsMiddleware
+
+# Generate requests/schemas
+go run . artisan make:request CreateUserRequest
+go run . artisan make:request UpdateUserRequest
+go run . artisan make:resource UserResource
+
+# Generate other components
+go run . artisan make:command ProcessOrdersCommand
+go run . artisan make:job SendEmailJob
+go run . artisan make:event UserRegisteredEvent
+go run . artisan make:listener SendWelcomeEmailListener
+```
+
+### Database Commands
+
+#### Migrations
+
+```bash
+# Run migrations
+go run . artisan migrate
+
+# Rollback migrations
+go run . artisan migrate:rollback
+go run . artisan migrate:rollback --step=3
+
+# Reset migrations
+go run . artisan migrate:reset
+
+# Refresh migrations
+go run . artisan migrate:refresh
+go run . artisan migrate:refresh --step=2
+
+# Fresh migrations (drop and recreate)
+go run . artisan migrate:fresh
+
+# Check migration status
+go run . artisan migrate:status
+
+# Create migration
+go run . artisan make:migration create_users_table
+go run . artisan make:migration add_phone_to_users_table
+go run . artisan make:migration create_posts_table --create=posts
+```
+
+#### Seeders
+
+```bash
+# Run all seeders
+go run . artisan db:seed
+
+# Run specific seeder
+go run . artisan db:seed --seeder=UserSeeder
+
+# Create seeder
+go run . artisan make:seeder UserSeeder
+go run . artisan make:seeder ProductSeeder
+```
+
+#### Database Backup/Restore
+
+```bash
+# Backup database
+go run . artisan db:backup
+go run . artisan db:backup --connection=mysql
+go run . artisan db:backup --schema-only
+go run . artisan db:backup --data-only
+
+# Restore database
+go run . artisan db:restore --file=backup.sql
+go run . artisan db:restore --file=backup.sql --connection=mysql
+```
+
+### Authentication Commands
+
+#### Auth Scaffolding
+
+```bash
+# Generate complete authentication system
+go run . artisan make:auth
+
+# Create superuser
+go run . artisan createsuperuser
+```
+
+#### User Management
+
+```bash
+# Create user
+go run . artisan user:create --email=user@example.com --name="John Doe"
+
+# Delete user
+go run . artisan user:delete --email=user@example.com
+
+# Assign role to user
+go run . artisan user:assign-role --email=user@example.com --role=admin
+
+# Remove role from user
+go run . artisan user:remove-role --email=user@example.com --role=admin
+
+# Assign permission to user
+go run . artisan user:assign-permission --email=user@example.com --permission=create_posts
+
+# Remove permission from user
+go run . artisan user:remove-permission --email=user@example.com --permission=create_posts
+```
+
+#### Role Management
+
+```bash
+# Create role
+go run . artisan role:create --name=admin --description="Administrator role"
+
+# Delete role
+go run . artisan role:delete --name=admin
+
+# Assign permission to role
+go run . artisan role:assign-permission --role=admin --permission=delete_users
+
+# Remove permission from role
+go run . artisan role:remove-permission --role=admin --permission=delete_users
+```
+
+#### Permission Management
+
+```bash
+# Create permission
+go run . artisan permission:create --name=create_posts --description="Create posts"
+
+# Delete permission
+go run . artisan permission:delete --name=create_posts
+```
+
+### Development Commands
+
+#### Server Management
+
+```bash
+# Start development server
+go run . artisan serve
+go run . artisan serve --port=8080
+go run . artisan serve --host=0.0.0.0 --port=3000
+
+# Show environment
+go run . artisan env
+
+# Clear configuration cache
+go run . artisan config:cache
+go run . artisan config:clear
+```
+
+#### Code Generation
+
+```bash
+# Generate Swagger documentation
+go run . artisan generate:swagger
+
+# Generate GraphQL schema
+go run . artisan generate:graphql
+
+# Watch for file changes
+go run . artisan watch
+```
+
+#### Route Management
+
+```bash
+# List all routes
+go run . artisan routes:list
+
+# List routes by method
+go run . artisan routes:list --method=GET
+
+# List routes by name
+go run . artisan routes:list --name=users
+
+# List routes by path
+go run . artisan routes:list --path=/api
+```
+
+### Queue Commands
+
+#### Queue Workers
+
+```bash
+# Start queue worker
+go run . artisan queue:work
+
+# Start worker with options
+go run . artisan queue:work --connection=redis --queue=high,default --tries=3 --timeout=60
+
+# Restart queue workers
+go run . artisan queue:restart
+
+# Clear queue
+go run . artisan queue:clear --connection=redis --queue=default
+```
+
+#### Failed Jobs
+
+```bash
+# List failed jobs
+go run . artisan queue:failed
+
+# Retry failed job
+go run . artisan queue:failed:retry 1
+
+# Delete failed job
+go run . artisan queue:failed:forget 1
+
+# Clear all failed jobs
+go run . artisan queue:failed:clear
+
+# Retry all failed jobs
+go run . artisan queue:retry 1 2 3
+```
+
+### Storage Commands
+
+#### File Storage
+
+```bash
+# Create storage link
+go run . artisan storage:link
+
+# Backup files
+go run . artisan storage:backup --source=storage/app --destination=backups/files
+
+# Restore files
+go run . artisan storage:restore --file=backups/files.tar.gz --destination=storage/app
+```
+
+### Monitoring Commands
+
+#### Health & Metrics
+
+```bash
+# Check application health
+go run . artisan health:check
+
+# Show metrics
+go run . artisan metrics
+
+# Monitor system resources
+go run . artisan monitor:system
+
+# Monitor queue status
+go run . artisan monitor:queue
+
+# Monitor cron jobs
+go run . artisan monitor:cron
+
+# Tail application logs
+go run . artisan monitor:log --file=storage/logs/app.log --lines=50
+```
+
+### Utility Commands
+
+#### Key Management
+
+```bash
+# Generate application key
+go run . artisan key:generate
+
+# Generate key (force in production)
+go run . artisan key:generate --force
+```
+
+#### Hashing & Encryption
+
+```bash
+# Hash a string
+go run . artisan hash "my-password" --algo=bcrypt
+
+# Encrypt a string
+go run . artisan encrypt "sensitive-data" --key=my-key
+
+# Decrypt a string
+go run . artisan decrypt "encrypted-data" --key=my-key
+```
+
+#### Task Scheduling
+
+```bash
+# Run scheduled tasks
+go run . artisan schedule:run
+
+# Start schedule worker
+go run . artisan schedule:work
+```
+
+#### Cache Management
+
+```bash
+# Clear cache
+go run . artisan cache:clear
+
+# Clear specific cache store
+go run . artisan cache:clear --store=redis
+
+# Forget cache key
+go run . artisan cache:forget "user:123"
+
+# Forget cache key from specific store
+go run . artisan cache:forget "user:123" --store=redis
+```
+
+#### Event Management
+
+```bash
+# Generate events and listeners
+go run . artisan event:generate
+```
+
+#### Vendor Management
+
+```bash
+# Publish vendor assets
+go run . artisan vendor:publish --provider=AuthServiceProvider
+
+# Publish assets by tag
+go run . artisan vendor:publish --tag=config
+```
+
+## Command Options
+
+### Global Options
+
+Most commands support these global options:
+
+```bash
+# Verbose output
+go run . artisan <command> --verbose
+
+# Quiet output
+go run . artisan <command> --quiet
+
+# Force operation
+go run . artisan <command> --force
+
+# Environment
+go run . artisan <command> --env=production
+```
+
+### Help System
+
+```bash
+# Show help for all commands
+go run . artisan list
+
+# Show help for specific command
+go run . artisan help make:controller
+
+# Show help for command group
+go run . artisan help make
+```
+
+## Custom Commands
+
+You can create custom artisan commands:
+
+```bash
+# Generate custom command
+go run . artisan make:command MyCustomCommand
+```
+
+This creates `app/commands/my_custom_command.go`:
+
+```go
+package commands
+
+import (
+    "github.com/urfave/cli/v2"
+)
+
+type MyCustomCommand struct{}
+
+func (c *MyCustomCommand) Command() *cli.Command {
+    return &cli.Command{
+        Name:  "my:custom",
+        Usage: "Run my custom command",
+        Action: func(ctx *cli.Context) error {
+            // Your custom logic here
+            return nil
+        },
+    }
+}
+```
+
+## Best Practices
+
+### 1. **Use Descriptive Names**
+```bash
+# Good
+go run . artisan make:controller UserProfileController
+go run . artisan make:model ProductCategory
+
+# Avoid
+go run . artisan make:controller UserCtrl
+go run . artisan make:model ProdCat
+```
+
+### 2. **Use Resource Controllers**
+```bash
+# Generate resource controller with all CRUD methods
+go run . artisan make:controller ProductController --resource
+```
+
+### 3. **Generate Related Components**
+```bash
+# Generate model with migration and seeder
+go run . artisan make:model Product --migration --seeder
+
+# Generate controller with request validation
+go run . artisan make:controller ProductController --resource
+go run . artisan make:request CreateProductRequest
+go run . artisan make:request UpdateProductRequest
+```
+
+### 4. **Use Modules for Organization**
+```bash
+# Create modules for related functionality
+go run . artisan make:module ecommerce --full
+go run . artisan make:module blog --full
+go run . artisan make:module cms --full
+```
+
+## Next Steps
+
+- [Database Commands](/docs/cli/database)
+- [Authentication Commands](/docs/cli/authentication)
+- [Development Commands](/docs/cli/development)
+- [Queue Commands](/docs/cli/queue)
+- [Monitoring Commands](/docs/cli/monitoring)

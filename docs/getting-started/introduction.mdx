@@ -1,0 +1,119 @@
+---
+title: "Introduction"
+description: "Welcome to Mithril - A batteries-included web framework for Go"
+---
+
+# Welcome to Mithril
+
+Mithril is a batteries-included web framework built on Fiber v2 with Laravel/Django-inspired features. It brings the developer experience of modern frameworks to the Go ecosystem, providing everything you need to build production-ready web applications.
+
+## Why Mithril?
+
+### 🚀 **Developer Experience**
+- **Artisan-like CLI**: Global CLI tool (`mithril new project`) + local artisan commands
+- **Code Generation**: Generate controllers, models, migrations, and more with simple commands
+- **Hot Reload**: Live reload during development with Air integration
+- **Comprehensive Testing**: Built-in testing utilities and helpers
+
+### 🏗️ **Modern Architecture**
+- **Fiber v2**: High-performance HTTP framework built on fasthttp
+- **GORM Integration**: Powerful ORM with migrations and multi-database support
+- **Dependency Injection**: Laravel-style service container
+- **Middleware Stack**: CORS, CSRF, rate limiting, sessions, and more
+
+### 🔐 **Security First**
+- **JWT Authentication**: Access and refresh token management
+- **RBAC System**: Role-based access control with permissions
+- **CSRF Protection**: Built-in CSRF token validation
+- **Rate Limiting**: Per-IP, per-user, and per-route rate limiting
+- **Security Headers**: Helmet-style security headers
+
+### 📊 **Production Ready**
+- **Health Checks**: Built-in health check endpoints
+- **Monitoring**: Prometheus metrics and OpenTelemetry support
+- **Logging**: Structured JSON logging with multiple levels
+- **Docker Support**: Multi-stage Dockerfile and docker-compose configurations
+- **Kubernetes**: Complete K8s deployment manifests
+
+## Key Features
+
+### Core Framework
+- **Configuration Management**: Environment-based config with validation
+- **Request/Response Validation**: FastAPI-style schema validation
+- **Auto-generated Swagger**: OpenAPI 3.0 documentation at `/docs`
+- **Module System**: Django-style app organization
+- **Template Engine**: HTML templates with Go's `html/template`
+
+### Database & Migrations
+- **Multi-database Support**: PostgreSQL, MySQL, SQLite, MongoDB
+- **Laravel-style Migrations**: Up/Down methods with rollback support
+- **Database Seeding**: Populate databases with test data
+- **Backup & Restore**: Full database backup and restore functionality
+- **UUID Primary Keys**: Secure, globally unique identifiers by default
+
+### Authentication & Authorization
+- **JWT Tokens**: Secure JSON Web Token authentication
+- **Session Management**: Database-backed session storage
+- **2FA Support**: TOTP authenticator apps
+- **Email Verification**: Built-in email verification system
+- **Password Reset**: Secure password reset flow
+- **RBAC**: Role-based access control with roles and permissions
+
+### File Storage
+- **S3 Integration**: AWS S3 support with SDK v2
+- **MinIO Support**: S3-compatible storage
+- **Local Storage**: File system storage for development
+- **File Operations**: Upload, download, stream, list, and delete files
+- **Backup/Restore**: Storage backup and restore functionality
+
+### Background Jobs
+- **Queue System**: Memory, Redis, RabbitMQ, and Kafka support
+- **Task Scheduling**: Cron-like scheduling with recurring tasks
+- **Job Retries**: Automatic retry with exponential backoff
+- **Failed Job Handling**: Dead letter queue and retry mechanisms
+
+### Real-time Communication
+- **WebSocket Support**: Real-time communication with room management
+- **gRPC Support**: High-performance RPC communication
+- **Broadcasting**: Message broadcasting to multiple clients
+
+### Monitoring & Observability
+- **Health Checks**: `/health`, `/livez`, `/readyz` endpoints
+- **Prometheus Metrics**: `/metrics` endpoint for monitoring
+- **OpenTelemetry**: Distributed tracing support
+- **Sentry Integration**: Error tracking and monitoring
+- **System Monitoring**: CPU, memory, disk, and network monitoring
+
+## Quick Comparison
+
+| Feature | Mithril | Gin | Echo | Fiber |
+|---------|---------|-----|------|-------|
+| **Performance** | ⚡ High | ⚡ High | ⚡ High | ⚡ Very High |
+| **CLI Tools** | ✅ Built-in | ❌ None | ❌ None | ❌ None |
+| **Code Generation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Migrations** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+| **Authentication** | ✅ Complete | ❌ Manual | ❌ Manual | ❌ Manual |
+| **Validation** | ✅ Schema-based | ❌ Manual | ❌ Manual | ❌ Manual |
+| **Documentation** | ✅ Auto-generated | ❌ Manual | ❌ Manual | ❌ Manual |
+| **Testing** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+
+## What's Next?
+
+Ready to get started? Here's what you can do next:
+
+1. **[Install Mithril](/docs/getting-started/installation)** - Get Mithril installed on your system
+2. **[Quick Start](/docs/getting-started/quick-start)** - Create your first Mithril project
+3. **[Core Concepts](/docs/core/application)** - Learn about the core framework concepts
+4. **[CLI Commands](/docs/cli/overview)** - Explore the powerful CLI tools
+5. **[Examples](/docs/examples/basic-api)** - See Mithril in action
+
+## Community & Support
+
+- **GitHub**: [mithril-framework/mithril](https://github.com/mithril-framework/mithril)
+- **Discord**: [Join our community](https://discord.gg/mithril)
+- **Issues**: [Report bugs or request features](https://github.com/mithril-framework/mithril/issues)
+- **Discussions**: [Ask questions](https://github.com/mithril-framework/mithril/discussions)
+
+---
+
+**Built with ❤️ in Go** - Mithril brings the best of Laravel and Django to the Go ecosystem.

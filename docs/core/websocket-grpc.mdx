@@ -1,0 +1,1063 @@
+---
+title: "WebSocket & gRPC Support"
+description: "Real-time communication with WebSocket and high-performance gRPC"
+---
+
+# WebSocket & gRPC Support
+
+Mithril provides comprehensive support for real-time communication through WebSocket and high-performance RPC through gRPC. These features enable building modern, interactive applications with real-time capabilities.
+
+## WebSocket Support
+
+### WebSocket Server
+
+```go
+// pkg/websocket/server.go
+package websocket
+
+import (
+    "github.com/gofiber/websocket/v2"
+    "github.com/gofiber/fiber/v2"
+    "sync"
+    "time"
+)
+
+type Server struct {
+    clients    map[*Client]bool
+    register   chan *Client
+    unregister chan *Client
+    broadcast  chan []byte
+    rooms      map[string]map[*Client]bool
+    mutex      sync.RWMutex
+}
+
+type Client struct {
+    conn     *websocket.Conn
+    send     chan []byte
+    server   *Server
+    userID   string
+    roomID   string
+    lastPing time.Time
+}
+
+type Message struct {
+    Type    string      `json:"type"`
+    Data    interface{} `json:"data"`
+    RoomID  string      `json:"room_id,omitempty"`
+    UserID  string      `json:"user_id,omitempty"`
+    Time    time.Time   `json:"time"`
+}
+
+func NewServer() *Server {
+    return &Server{
+        clients:    make(map[*Client]bool),
+        register:   make(chan *Client),
+        unregister: make(chan *Client),
+        broadcast:  make(chan []byte),
+        rooms:      make(map[string]map[*Client]bool),
+    }
+}
+
+func (s *Server) Run() {
+    for {
+        select {
+        case client := <-s.register:
+            s.mutex.Lock()
+            s.clients[client] = true
+            if client.roomID != "" {
+                if s.rooms[client.roomID] == nil {
+                    s.rooms[client.roomID] = make(map[*Client]bool)
+                }
+                s.rooms[client.roomID][client] = true
+            }
+            s.mutex.Unlock()
+            
+            // Send welcome message
+            client.send <- []byte(`{"type":"welcome","data":{"message":"Connected to server"}}`)
+            
+        case client := <-s.unregister:
+            s.mutex.Lock()
+            if _, ok := s.clients[client]; ok {
+                delete(s.clients, client)
+                close(client.send)
+                
+                if client.roomID != "" {
+                    if room, exists := s.rooms[client.roomID]; exists {
+                        delete(room, client)
+                        if len(room) == 0 {
+                            delete(s.rooms, client.roomID)
+                        }
+                    }
+                }
+            }
+            s.mutex.Unlock()
+            
+        case message := <-s.broadcast:
+            s.mutex.RLock()
+            for client := range s.clients {
+                select {
+                case client.send <- message:
+                default:
+                    close(client.send)
+                    delete(s.clients, client)
+                }
+            }
+            s.mutex.RUnlock()
+        }
+    }
+}
+
+func (s *Server) BroadcastToRoom(roomID string, message []byte) {
+    s.mutex.RLock()
+    if room, exists := s.rooms[roomID]; exists {
+        for client := range room {
+            select {
+            case client.send <- message:
+            default:
+                close(client.send)
+                delete(s.clients, client)
+            }
+        }
+    }
+    s.mutex.RUnlock()
+}
+
+func (s *Server) BroadcastToUser(userID string, message []byte) {
+    s.mutex.RLock()
+    for client := range s.clients {
+        if client.userID == userID {
+            select {
+            case client.send <- message:
+            default:
+                close(client.send)
+                delete(s.clients, client)
+            }
+        }
+    }
+    s.mutex.RUnlock()
+}
+```
+
+### WebSocket Client Handler
+
+```go
+// pkg/websocket/client.go
+package websocket
+
+import (
+    "encoding/json"
+    "log"
+    "time"
+    "github.com/gofiber/websocket/v2"
+)
+
+func (c *Client) readPump() {
+    defer func() {
+        c.server.unregister <- c
+        c.conn.Close()
+    }()
+    
+    c.conn.SetReadLimit(512)
+    c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+    c.conn.SetPongHandler(func(string) error {
+        c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+        return nil
+    })
+    
+    for {
+        _, message, err := c.conn.ReadMessage()
+        if err != nil {
+            if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+                log.Printf("WebSocket error: %v", err)
+            }
+            break
+        }
+        
+        c.handleMessage(message)
+    }
+}
+
+func (c *Client) writePump() {
+    ticker := time.NewTicker(54 * time.Second)
+    defer func() {
+        ticker.Stop()
+        c.conn.Close()
+    }()
+    
+    for {
+        select {
+        case message, ok := <-c.send:
+            c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+            if !ok {
+                c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+                return
+            }
+            
+            if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+                return
+            }
+            
+        case <-ticker.C:
+            c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+            if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+                return
+            }
+        }
+    }
+}
+
+func (c *Client) handleMessage(message []byte) {
+    var msg Message
+    if err := json.Unmarshal(message, &msg); err != nil {
+        log.Printf("Error unmarshaling message: %v", err)
+        return
+    }
+    
+    msg.Time = time.Now()
+    msg.UserID = c.userID
+    
+    switch msg.Type {
+    case "join_room":
+        c.joinRoom(msg.Data.(map[string]interface{})["room_id"].(string))
+    case "leave_room":
+        c.leaveRoom()
+    case "chat_message":
+        c.handleChatMessage(msg)
+    case "ping":
+        c.handlePing()
+    default:
+        log.Printf("Unknown message type: %s", msg.Type)
+    }
+}
+
+func (c *Client) joinRoom(roomID string) {
+    c.server.mutex.Lock()
+    if c.roomID != "" {
+        if room, exists := c.server.rooms[c.roomID]; exists {
+            delete(room, c)
+        }
+    }
+    
+    c.roomID = roomID
+    if c.server.rooms[roomID] == nil {
+        c.server.rooms[roomID] = make(map[*Client]bool)
+    }
+    c.server.rooms[roomID][c] = true
+    c.server.mutex.Unlock()
+    
+    // Notify room about new user
+    notification := Message{
+        Type:   "user_joined",
+        Data:   map[string]interface{}{"user_id": c.userID},
+        RoomID: roomID,
+        Time:   time.Now(),
+    }
+    
+    if data, err := json.Marshal(notification); err == nil {
+        c.server.BroadcastToRoom(roomID, data)
+    }
+}
+
+func (c *Client) leaveRoom() {
+    if c.roomID == "" {
+        return
+    }
+    
+    c.server.mutex.Lock()
+    if room, exists := c.server.rooms[c.roomID]; exists {
+        delete(room, c)
+        if len(room) == 0 {
+            delete(c.server.rooms, c.roomID)
+        }
+    }
+    c.server.mutex.Unlock()
+    
+    // Notify room about user leaving
+    notification := Message{
+        Type:   "user_left",
+        Data:   map[string]interface{}{"user_id": c.userID},
+        RoomID: c.roomID,
+        Time:   time.Now(),
+    }
+    
+    if data, err := json.Marshal(notification); err == nil {
+        c.server.BroadcastToRoom(c.roomID, data)
+    }
+    
+    c.roomID = ""
+}
+
+func (c *Client) handleChatMessage(msg Message) {
+    if c.roomID == "" {
+        return
+    }
+    
+    // Broadcast message to room
+    if data, err := json.Marshal(msg); err == nil {
+        c.server.BroadcastToRoom(c.roomID, data)
+    }
+}
+
+func (c *Client) handlePing() {
+    pong := Message{
+        Type: "pong",
+        Data: map[string]interface{}{"timestamp": time.Now().Unix()},
+        Time: time.Now(),
+    }
+    
+    if data, err := json.Marshal(pong); err == nil {
+        c.send <- data
+    }
+}
+```
+
+### WebSocket Middleware
+
+```go
+// pkg/websocket/middleware.go
+package websocket
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/websocket/v2"
+    "strings"
+)
+
+func WebSocketUpgrade() fiber.Handler {
+    return websocket.New(func(c *websocket.Conn) {
+        // Get user ID from query params or headers
+        userID := c.Query("user_id")
+        if userID == "" {
+            userID = c.Headers("X-User-ID")
+        }
+        
+        // Create client
+        client := &Client{
+            conn:   c,
+            send:   make(chan []byte, 256),
+            server: GetServer(),
+            userID: userID,
+        }
+        
+        // Register client
+        client.server.register <- client
+        
+        // Start goroutines
+        go client.writePump()
+        go client.readPump()
+    })
+}
+
+func WebSocketAuth() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        token := c.Query("token")
+        if token == "" {
+            token = c.Get("Authorization")
+            if strings.HasPrefix(token, "Bearer ") {
+                token = token[7:]
+            }
+        }
+        
+        if token == "" {
+            return c.Status(401).JSON(fiber.Map{"error": "Authentication required"})
+        }
+        
+        // Validate JWT token
+        claims, err := jwt.ValidateToken(token)
+        if err != nil {
+            return c.Status(401).JSON(fiber.Map{"error": "Invalid token"})
+        }
+        
+        // Set user ID in context
+        c.Locals("user_id", claims.UserID)
+        
+        return c.Next()
+    }
+}
+```
+
+### WebSocket Routes
+
+```go
+// routes/websocket.go
+package routes
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/websocket"
+    "my-app/pkg/middleware"
+)
+
+func SetupWebSocketRoutes(app *fiber.App) {
+    ws := app.Group("/ws")
+    
+    // Public WebSocket endpoint
+    ws.Get("/", websocket.WebSocketUpgrade())
+    
+    // Authenticated WebSocket endpoint
+    ws.Get("/auth", middleware.WebSocketAuth(), websocket.WebSocketUpgrade())
+    
+    // Room-specific WebSocket
+    ws.Get("/room/:roomId", websocket.WebSocketUpgrade())
+}
+```
+
+## gRPC Support
+
+### gRPC Server
+
+```go
+// pkg/grpc/server.go
+package grpc
+
+import (
+    "context"
+    "log"
+    "net"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/reflection"
+)
+
+type Server struct {
+    grpcServer *grpc.Server
+    port       string
+}
+
+func NewServer(port string) *Server {
+    s := grpc.NewServer()
+    
+    // Register services
+    RegisterUserServiceServer(s, &UserService{})
+    RegisterProductServiceServer(s, &ProductService{})
+    RegisterNotificationServiceServer(s, &NotificationService{})
+    
+    // Enable reflection
+    reflection.Register(s)
+    
+    return &Server{
+        grpcServer: s,
+        port:       port,
+    }
+}
+
+func (s *Server) Start() error {
+    lis, err := net.Listen("tcp", ":"+s.port)
+    if err != nil {
+        return err
+    }
+    
+    log.Printf("gRPC server listening on port %s", s.port)
+    return s.grpcServer.Serve(lis)
+}
+
+func (s *Server) Stop() {
+    s.grpcServer.GracefulStop()
+}
+```
+
+### gRPC Service Definitions
+
+```protobuf
+// proto/user.proto
+syntax = "proto3";
+
+package user;
+
+option go_package = "my-app/proto/user";
+
+service UserService {
+    rpc GetUser(GetUserRequest) returns (GetUserResponse);
+    rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+    rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+    rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+    rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message GetUserResponse {
+    User user = 1;
+}
+
+message CreateUserRequest {
+    string email = 1;
+    string name = 2;
+    int32 age = 3;
+}
+
+message CreateUserResponse {
+    User user = 1;
+}
+
+message UpdateUserRequest {
+    string id = 1;
+    string name = 2;
+    int32 age = 3;
+}
+
+message UpdateUserResponse {
+    User user = 1;
+}
+
+message DeleteUserRequest {
+    string id = 1;
+}
+
+message DeleteUserResponse {
+    bool success = 1;
+}
+
+message ListUsersRequest {
+    int32 page = 1;
+    int32 per_page = 2;
+    string search = 3;
+}
+
+message ListUsersResponse {
+    repeated User users = 1;
+    int32 total = 2;
+    int32 page = 3;
+    int32 per_page = 4;
+}
+
+message User {
+    string id = 1;
+    string email = 2;
+    string name = 3;
+    int32 age = 4;
+    string created_at = 5;
+    string updated_at = 6;
+}
+```
+
+### gRPC Service Implementation
+
+```go
+// pkg/grpc/user_service.go
+package grpc
+
+import (
+    "context"
+    "my-app/app/services"
+    "my-app/proto/user"
+)
+
+type UserService struct {
+    user.UnimplementedUserServiceServer
+    userService *services.UserService
+}
+
+func NewUserService(userService *services.UserService) *UserService {
+    return &UserService{
+        userService: userService,
+    }
+}
+
+func (s *UserService) GetUser(ctx context.Context, req *user.GetUserRequest) (*user.GetUserResponse, error) {
+    u, err := s.userService.GetByID(req.Id)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &user.GetUserResponse{
+        User: &user.User{
+            Id:        u.ID,
+            Email:     u.Email,
+            Name:      u.Name,
+            Age:       int32(u.Age),
+            CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+            UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+        },
+    }, nil
+}
+
+func (s *UserService) CreateUser(ctx context.Context, req *user.CreateUserRequest) (*user.CreateUserResponse, error) {
+    u, err := s.userService.Create(services.CreateUserRequest{
+        Email: req.Email,
+        Name:  req.Name,
+        Age:   int(req.Age),
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return &user.CreateUserResponse{
+        User: &user.User{
+            Id:        u.ID,
+            Email:     u.Email,
+            Name:      u.Name,
+            Age:       int32(u.Age),
+            CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+            UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+        },
+    }, nil
+}
+
+func (s *UserService) UpdateUser(ctx context.Context, req *user.UpdateUserRequest) (*user.UpdateUserResponse, error) {
+    u, err := s.userService.Update(req.Id, services.UpdateUserRequest{
+        Name: req.Name,
+        Age:  int(req.Age),
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return &user.UpdateUserResponse{
+        User: &user.User{
+            Id:        u.ID,
+            Email:     u.Email,
+            Name:      u.Name,
+            Age:       int32(u.Age),
+            CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+            UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+        },
+    }, nil
+}
+
+func (s *UserService) DeleteUser(ctx context.Context, req *user.DeleteUserRequest) (*user.DeleteUserResponse, error) {
+    err := s.userService.Delete(req.Id)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &user.DeleteUserResponse{
+        Success: true,
+    }, nil
+}
+
+func (s *UserService) ListUsers(ctx context.Context, req *user.ListUsersRequest) (*user.ListUsersResponse, error) {
+    users, total, err := s.userService.GetPaginated(int(req.Page), int(req.PerPage), req.Search)
+    if err != nil {
+        return nil, err
+    }
+    
+    var grpcUsers []*user.User
+    for _, u := range users {
+        grpcUsers = append(grpcUsers, &user.User{
+            Id:        u.ID,
+            Email:     u.Email,
+            Name:      u.Name,
+            Age:       int32(u.Age),
+            CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+            UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+        })
+    }
+    
+    return &user.ListUsersResponse{
+        Users:    grpcUsers,
+        Total:    int32(total),
+        Page:     req.Page,
+        PerPage:  req.PerPage,
+    }, nil
+}
+```
+
+### gRPC Client
+
+```go
+// pkg/grpc/client.go
+package grpc
+
+import (
+    "context"
+    "google.golang.org/grpc"
+    "my-app/proto/user"
+)
+
+type Client struct {
+    conn         *grpc.ClientConn
+    userService  user.UserServiceClient
+}
+
+func NewClient(address string) (*Client, error) {
+    conn, err := grpc.Dial(address, grpc.WithInsecure())
+    if err != nil {
+        return nil, err
+    }
+    
+    return &Client{
+        conn:        conn,
+        userService: user.NewUserServiceClient(conn),
+    }, nil
+}
+
+func (c *Client) Close() error {
+    return c.conn.Close()
+}
+
+func (c *Client) GetUser(ctx context.Context, id string) (*user.User, error) {
+    resp, err := c.userService.GetUser(ctx, &user.GetUserRequest{Id: id})
+    if err != nil {
+        return nil, err
+    }
+    return resp.User, nil
+}
+
+func (c *Client) CreateUser(ctx context.Context, email, name string, age int32) (*user.User, error) {
+    resp, err := c.userService.CreateUser(ctx, &user.CreateUserRequest{
+        Email: email,
+        Name:  name,
+        Age:   age,
+    })
+    if err != nil {
+        return nil, err
+    }
+    return resp.User, nil
+}
+```
+
+## Real-time Chat Example
+
+### Chat Controller
+
+```go
+// app/controllers/chat_controller.go
+package controllers
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "my-app/pkg/websocket"
+)
+
+type ChatController struct {
+    wsServer *websocket.Server
+}
+
+func NewChatController(wsServer *websocket.Server) *ChatController {
+    return &ChatController{
+        wsServer: wsServer,
+    }
+}
+
+func (c *ChatController) SendMessage(ctx *fiber.Ctx) error {
+    var req struct {
+        RoomID  string `json:"room_id"`
+        Message string `json:"message"`
+    }
+    
+    if err := ctx.BodyParser(&req); err != nil {
+        return ctx.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+    }
+    
+    userID := ctx.Locals("user_id").(string)
+    
+    message := websocket.Message{
+        Type:   "chat_message",
+        Data:   map[string]interface{}{"message": req.Message, "user_id": userID},
+        RoomID: req.RoomID,
+        UserID: userID,
+    }
+    
+    if data, err := json.Marshal(message); err == nil {
+        c.wsServer.BroadcastToRoom(req.RoomID, data)
+    }
+    
+    return ctx.JSON(fiber.Map{"status": "sent"})
+}
+
+func (c *ChatController) GetOnlineUsers(ctx *fiber.Ctx) error {
+    roomID := ctx.Params("roomId")
+    
+    // Get online users in room
+    onlineUsers := c.wsServer.GetOnlineUsers(roomID)
+    
+    return ctx.JSON(fiber.Map{
+        "online_users": onlineUsers,
+        "count":        len(onlineUsers),
+    })
+}
+```
+
+### Frontend Integration
+
+```javascript
+// public/js/chat.js
+class ChatClient {
+    constructor(url, userId) {
+        this.url = url;
+        this.userId = userId;
+        this.socket = null;
+        this.roomId = null;
+    }
+    
+    connect() {
+        this.socket = new WebSocket(`${this.url}?user_id=${this.userId}`);
+        
+        this.socket.onopen = () => {
+            console.log('Connected to chat server');
+            this.showStatus('Connected', 'success');
+        };
+        
+        this.socket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.handleMessage(message);
+        };
+        
+        this.socket.onclose = () => {
+            console.log('Disconnected from chat server');
+            this.showStatus('Disconnected', 'error');
+        };
+        
+        this.socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.showStatus('Connection error', 'error');
+        };
+    }
+    
+    joinRoom(roomId) {
+        this.roomId = roomId;
+        this.sendMessage({
+            type: 'join_room',
+            data: { room_id: roomId }
+        });
+    }
+    
+    leaveRoom() {
+        this.sendMessage({
+            type: 'leave_room',
+            data: {}
+        });
+        this.roomId = null;
+    }
+    
+    sendChatMessage(message) {
+        this.sendMessage({
+            type: 'chat_message',
+            data: { message: message }
+        });
+    }
+    
+    sendMessage(message) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify(message));
+        }
+    }
+    
+    handleMessage(message) {
+        switch (message.type) {
+            case 'welcome':
+                console.log('Welcome message:', message.data.message);
+                break;
+            case 'chat_message':
+                this.displayMessage(message.data);
+                break;
+            case 'user_joined':
+                this.showUserJoined(message.data.user_id);
+                break;
+            case 'user_left':
+                this.showUserLeft(message.data.user_id);
+                break;
+            case 'pong':
+                console.log('Pong received');
+                break;
+        }
+    }
+    
+    displayMessage(data) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message';
+        messageElement.innerHTML = `
+            <strong>${data.user_id}:</strong> ${data.message}
+        `;
+        document.getElementById('messages').appendChild(messageElement);
+    }
+    
+    showUserJoined(userId) {
+        const notification = document.createElement('div');
+        notification.className = 'notification info';
+        notification.textContent = `${userId} joined the room`;
+        document.getElementById('notifications').appendChild(notification);
+    }
+    
+    showUserLeft(userId) {
+        const notification = document.createElement('div');
+        notification.className = 'notification warning';
+        notification.textContent = `${userId} left the room`;
+        document.getElementById('notifications').appendChild(notification);
+    }
+    
+    showStatus(message, type) {
+        const statusElement = document.getElementById('status');
+        statusElement.textContent = message;
+        statusElement.className = `status ${type}`;
+    }
+}
+
+// Initialize chat
+const chat = new ChatClient('ws://localhost:3000/ws', 'user123');
+chat.connect();
+
+// Join room
+document.getElementById('joinRoom').addEventListener('click', () => {
+    const roomId = document.getElementById('roomId').value;
+    chat.joinRoom(roomId);
+});
+
+// Send message
+document.getElementById('sendMessage').addEventListener('click', () => {
+    const message = document.getElementById('messageInput').value;
+    if (message.trim()) {
+        chat.sendChatMessage(message);
+        document.getElementById('messageInput').value = '';
+    }
+});
+```
+
+## Configuration
+
+### WebSocket Configuration
+
+```bash
+# WebSocket Configuration
+WEBSOCKET_ENABLED=true
+WEBSOCKET_PORT=3001
+WEBSOCKET_PATH=/ws
+WEBSOCKET_PING_INTERVAL=54s
+WEBSOCKET_PONG_TIMEOUT=60s
+WEBSOCKET_MAX_MESSAGE_SIZE=512
+WEBSOCKET_READ_BUFFER_SIZE=1024
+WEBSOCKET_WRITE_BUFFER_SIZE=1024
+```
+
+### gRPC Configuration
+
+```bash
+# gRPC Configuration
+GRPC_ENABLED=true
+GRPC_PORT=50051
+GRPC_HOST=localhost
+GRPC_MAX_RECV_MSG_SIZE=4194304
+GRPC_MAX_SEND_MSG_SIZE=4194304
+GRPC_KEEPALIVE_TIME=30s
+GRPC_KEEPALIVE_TIMEOUT=5s
+```
+
+## Testing
+
+### WebSocket Testing
+
+```go
+// pkg/websocket/websocket_test.go
+package websocket
+
+import (
+    "net/http/httptest"
+    "testing"
+    "github.com/gorilla/websocket"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestWebSocketConnection(t *testing.T) {
+    server := NewServer()
+    go server.Run()
+    
+    // Create test server
+    s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Upgrade to WebSocket
+        upgrader := websocket.Upgrader{}
+        conn, err := upgrader.Upgrade(w, r, nil)
+        assert.NoError(t, err)
+        
+        client := &Client{
+            conn:   conn,
+            send:   make(chan []byte, 256),
+            server: server,
+            userID: "test-user",
+        }
+        
+        server.register <- client
+    }))
+    defer s.Close()
+    
+    // Connect to WebSocket
+    ws, _, err := websocket.DefaultDialer.Dial("ws://"+s.URL[7:], nil)
+    assert.NoError(t, err)
+    defer ws.Close()
+    
+    // Send test message
+    err = ws.WriteMessage(websocket.TextMessage, []byte(`{"type":"ping","data":{}}`))
+    assert.NoError(t, err)
+    
+    // Read response
+    _, message, err := ws.ReadMessage()
+    assert.NoError(t, err)
+    assert.Contains(t, string(message), "pong")
+}
+```
+
+### gRPC Testing
+
+```go
+// pkg/grpc/user_service_test.go
+package grpc
+
+import (
+    "context"
+    "testing"
+    "my-app/proto/user"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestUserService(t *testing.T) {
+    // Create test server
+    server := NewServer("0")
+    go server.Start()
+    
+    // Create client
+    client, err := NewClient("localhost:50051")
+    assert.NoError(t, err)
+    defer client.Close()
+    
+    // Test CreateUser
+    user, err := client.CreateUser(context.Background(), "test@example.com", "Test User", 25)
+    assert.NoError(t, err)
+    assert.Equal(t, "test@example.com", user.Email)
+    assert.Equal(t, "Test User", user.Name)
+    assert.Equal(t, int32(25), user.Age)
+    
+    // Test GetUser
+    retrievedUser, err := client.GetUser(context.Background(), user.Id)
+    assert.NoError(t, err)
+    assert.Equal(t, user.Id, retrievedUser.Id)
+    assert.Equal(t, user.Email, retrievedUser.Email)
+}
+```
+
+## Best Practices
+
+### 1. **WebSocket Best Practices**
+- Implement proper connection management
+- Use heartbeats to detect dead connections
+- Implement room-based messaging
+- Handle connection errors gracefully
+- Use appropriate message formats
+
+### 2. **gRPC Best Practices**
+- Use proper error handling
+- Implement timeouts and retries
+- Use streaming for large data
+- Implement proper authentication
+- Use connection pooling
+
+### 3. **Security**
+- Authenticate WebSocket connections
+- Validate all incoming messages
+- Use TLS for production
+- Implement rate limiting
+- Sanitize user input
+
+### 4. **Performance**
+- Use connection pooling for gRPC
+- Implement message queuing for WebSocket
+- Monitor connection counts
+- Use appropriate buffer sizes
+- Implement backpressure handling
+
+## Next Steps
+
+- [Authentication System](/docs/authentication/jwt)
+- [Real-time Features](/docs/examples/websocket-chat)
+- [Microservices](/docs/examples/microservice)
+- [Monitoring](/docs/monitoring/overview)
