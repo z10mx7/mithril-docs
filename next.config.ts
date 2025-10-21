@@ -1,14 +1,24 @@
-import { defineConfig } from "contentlayer/next";
-import { withContentlayer } from "next-contentlayer";
+// import createMDX from '@next/mdx';
+import { createContentlayerPlugin } from 'next-contentlayer2';
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
+  // pageExtensions: ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'],
+  webpack: (config: { cache: boolean }) => {
+    config.cache = false;
+    return config;
   },
   images: {
-    domains: ["images.unsplash.com"],
+    remotePatterns: [
+      {
+        protocol: 'https' as 'https',
+        hostname: 'avatars.githubusercontent.com',
+      },
+    ],
   },
 };
+
+const withContentlayer = createContentlayerPlugin({
+  // Additional Contentlayer config options
+});
 
 export default withContentlayer(nextConfig);
