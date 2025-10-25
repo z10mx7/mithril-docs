@@ -14,12 +14,10 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarMenuItem,
   SidebarTrigger,
   SidebarHeaderLogo,
   SidebarHeaderTitle,
-  UserAvatar,
   NestedLink,
 } from '@/components/sidebar';
 import { Github } from 'lucide-react';
@@ -73,7 +71,6 @@ export default function DocsLayout({
                 isCollapsable={section.pages && section.pages.length > 0}
                 key={section.title}
                 label={section.title}
-                href={section.href}
                 icon={section.icon}
                 defaultOpen={section.defaultOpen}
               >
