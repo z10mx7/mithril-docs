@@ -1,50 +1,50 @@
 export const meta = {
-  metadataBase: new URL('https://pinexio.vercel.app'),
-  title: 'Pinexio - Documentation template',
+  metadataBase: new URL('https://Mithril.vercel.app'),
+  title: 'Mithril - Documentation  ',
   description:
     'A customizable Open Source documentation template built with Next.js',
-  authors: [{ name: 'Sanjay Rajeev' }],
+  authors: [{ name: 'z10mx7' }],
   keywords: [
-    'Pinexio',
-    'documentation template',
+    'Mithril',
+    'documentation  ',
     'template',
     'Next.js',
     'React',
     'JavaScript',
   ],
-  publisher: 'Sanjay Rajeev',
-  creator: 'Sanjay Rajeev',
+  publisher: 'z10mx7',
+  creator: 'z10mx7',
   openGraph: {
     type: 'website',
-    title: 'Pinexio - Documentation Template',
+    title: 'Mithril - Documentation  ',
     description:
-      'A customizable open-source documentation template built with Next.js.',
+      'A customizable open-source documentation   built with Next.js.',
     images: [
       {
         url: '/og_image.png',
         width: 1200,
         height: 630,
-        alt: 'Pinexio Documentation Template',
+        alt: 'Mithril Documentation  ',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image', // Type of Twitter card
-    title: 'Pinexio - Documentation Template', // Twitter card title
+    title: 'Mithril - Documentation', // Twitter card title
     description:
       'A customizable open-source documentation template built with Next.js.', // Twitter card description
     images: ['/og_image.png'], // Image used in the Twitter card
-    creator: '@sanjayrajeev', // Twitter handle of the content creator (optional)
+    creator: '@z10mx7', // Twitter handle of the content creator (optional)
   },
   // SEO Enhancements
   alternates: {
-    canonical: 'https://pinexio.vercel.app', // Set the canonical URL
+    canonical: 'https://mithril-docs-nine.vercel.app', // Set the canonical URL
   },
   robots: 'index, follow', // Allows search engines to index and follow links
   // Optional: Hreflang for multilingual content (if applicable)
   hreflang: {
-    en: 'https://pinexio.vercel.app', // English version URL
+    en: 'https://mithril-docs-nine.vercel.app', // English version URL
     // Add more hreflang if you have other languages (example: Spanish)
-    // "es": "https://pinexio.vercel.app/es",
+    // "es": "https://mithril-docs-nine.vercel.app/es",
   },
 };

@@ -22,7 +22,7 @@ export default function Home() {
             <ModeToggle />
             <Button
               onClick={() =>
-                router.push('https://github.com/sanjayc208/pinexio')
+                router.push('https://github.com/mithril-framework')
               }
             >
               <Github className="h-[1.2rem] w-[1.2rem] transition-all" />
@@ -90,7 +90,7 @@ export default function Home() {
               variant={'outline'}
               size={'md'}
               onClick={() =>
-                router.push('https://github.com/sanjayc208/pinexio')
+                router.push('https://github.com/mithril-framework')
               }
             >
               <Github size={20} />
@@ -148,7 +148,7 @@ export default function Home() {
               className="px-4 py-2 text-sm font-medium gap-2"
               onClick={() =>
                 window.open(
-                  'https://vercel.com/new/clone?repository-url=https://github.com/sanjayc208/pinexio',
+                  'https://vercel.com/new/clone?repository-url=https://github.com/mithril-framework',
                   '_blank'
                 )
               }

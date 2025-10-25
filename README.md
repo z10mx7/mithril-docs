@@ -1,14 +1,14 @@
-<a href="https://pinexio.vercel.app/">
+<a href="https://mithril-docs-nine.vercel.app">
 <p align="center">
   <img src="./public/logos/pinedocs.png"  align="center" alt="fox logo" width="200px">
-  <h1 align="center"> PINEXIO </h1>
+  <h1 align="center"> Mithril </h1>
   <p align="center">
-   Pinexio is a modern, customizable documentation template built for Next.js 15, Tailwind CSS 4, and MDX. It makes creating, managing, and presenting your project documentation effortless.
+   Mithril is a modern, customizable documentation template built for Next.js 15, Tailwind CSS 4, and MDX. It makes creating, managing, and presenting your project documentation effortless.
   </p>
 </p>
 </a>
 
-## Why Pinexio?
+## Why Mithril?
 
 - **Customizable UI** 🌈: Tailor the design to your needs with light/dark themes and minimal UI libraries.
 - **MDX Support** 📚: Write rich, interactive documentation with JSX components.
@@ -30,8 +30,8 @@
 
 ## Links
 
-- [View Demo](https://pinexio.vercel.app)
-- [GitHub Repo](https://github.com/sanjayc208/pinexio)
+- [View Demo](https://Mithril.vercel.app)
+- [GitHub Repo](https://github.com/mithril-framework/)
 
 ---
 
@@ -43,6 +43,6 @@ Check out the [Next.js deployment guide](https://nextjs.org/docs/deployment) for
 
 Ready to go live? Click the button below and deploy your app in just a few clicks! 🔥
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sanjayc208/pinexio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/mithril-framework/)
 
-_Pinexio is open-source and free to use. Happy documenting!_ 🚀
+Mithril is open-source and free to use. Happy documenting!_ 🚀

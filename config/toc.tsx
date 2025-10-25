@@ -17,17 +17,17 @@ type TocData = {
 export const TocData: TocData = {
   'getting-started/introduction': [
     {
-      title: 'Welcome to Pinexio',
-      href: '/docs/getting-started/introduction#welcome-to-pinexio',
+      title: 'Welcome to Mithril',
+      href: '/docs/getting-started/introduction#welcome-to-Mithril',
       pages: [
         {
-          title: 'Why Choose Pinexio',
-          href: '/docs/getting-started/introduction#why-choose-pinexio',
+          title: 'Why Choose Mithril',
+          href: '/docs/getting-started/introduction#why-choose-Mithril',
         },
 
         {
-          title: 'What Makes Pinexio Special',
-          href: '/docs/getting-started/introduction#what-makes-pinexio-special',
+          title: 'What Makes Mithril Special',
+          href: '/docs/getting-started/introduction#what-makes-Mithril-special',
         },
       ],
     },
