@@ -18,34 +18,20 @@ Before installing Mithril, make sure you have the following installed:
 
 ## Installation Methods
 
-### Method 1: One-Line Installation (Recommended)
-
-**Linux/macOS:**
-```bash
-# Simple installation using go install
-curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install-simple.sh | sh
-```
-
-**Windows (PowerShell):**
-```powershell
-# PowerShell installation
-iwr -useb https://raw.githubusercontent.com/mithril-framework/mithril/main/install.ps1 | iex
-```
-
-**Windows (Command Prompt):**
-```cmd
-# Command Prompt installation
-curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.bat | cmd
-```
-
-### Method 2: Advanced Installation
+### Method 1: Universal One-Line Installation (Recommended)
 
 ```bash
-# Full installation with binary downloads and fallbacks
+# Automatic OS detection and installation
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-### Method 3: Manual Installation
+This single command automatically:
+- Detects your operating system (Linux, macOS, Windows)
+- Downloads the appropriate installation script
+- Installs Mithril with the best method for your platform
+- Verifies the installation
+
+### Method 2: Manual Installation
 
 ```bash
 # Install the global CLI tool manually
@@ -55,7 +41,7 @@ go install github.com/mithril-framework/mithril/cmd/mithril@latest
 mithril --version
 ```
 
-### Method 4: Install from Source
+### Method 3: Install from Source
 
 ```bash
 # Clone the repository
@@ -70,7 +56,7 @@ sudo mv mithril /usr/local/bin/
 mithril --version
 ```
 
-### Method 5: Using Go Modules (For Development)
+### Method 4: Using Go Modules (For Development)
 
 ```bash
 # Create a new directory for your project
@@ -102,27 +88,22 @@ EOF
 go run main.go
 ```
 
-## Installation Scripts Explained
+## Installation Script Explained
 
-The Mithril framework provides several installation scripts to make setup as easy as possible:
+The Mithril framework provides a universal installation script that automatically detects your operating system and installs the appropriate version:
 
-### Simple Installation Script (`install-simple.sh`)
-- **Best for**: Most users who want a quick setup
-- **What it does**: Uses `go install` to install the latest version
-- **Requirements**: Go 1.21+ installed
-- **Platforms**: Linux, macOS, Windows (with WSL)
-
-### Advanced Installation Script (`install.sh`)
-- **Best for**: Users who want pre-built binaries or have network issues
-- **What it does**: Downloads pre-built binaries from GitHub releases, falls back to building from source
-- **Requirements**: Go 1.21+ (as fallback), curl/wget
-- **Platforms**: Linux, macOS, Windows (with WSL)
-
-### Windows Scripts
-- **`install.ps1`**: PowerShell script for Windows users
-- **`install.bat`**: Batch file for Command Prompt users
-- **What they do**: Install via `go install` with proper error handling
-- **Requirements**: Go 1.21+ installed, PowerShell or Command Prompt
+### Universal Installation Script (`install.sh`)
+- **What it does**: Automatically detects your OS and installs Mithril using the best method for your platform
+- **Platforms**: Linux, macOS, Windows (with WSL), and other Unix-like systems
+- **Requirements**: 
+  - `curl` or `wget` for downloading
+  - Go 1.21+ (for fallback building from source)
+- **Features**:
+  - Automatic OS detection
+  - Downloads pre-built binaries when available
+  - Falls back to building from source if needed
+  - Verifies installation after completion
+  - Provides helpful error messages and troubleshooting tips
 
 ## Quick Start
 
@@ -323,7 +304,7 @@ curl: command not found
 
 **Solution**: 
 - Install curl: `sudo apt-get install curl` (Ubuntu/Debian) or `brew install curl` (macOS)
-- Use manual installation method instead
+- Use manual installation method: `go install github.com/mithril-framework/mithril/cmd/mithril@latest`
 - Check your internet connection
 
 #### 2. Go Version Error
