@@ -1,9 +1,9 @@
-import { Component, Paintbrush, Rocket, Search, Wrench } from 'lucide-react';
+import { Component, Database, Shield, Code, Server, Container, Activity, FileText, Users, Wrench } from 'lucide-react';
 
 export const sidebarNav = [
   {
     title: 'Getting Started',
-    icon: <Rocket className="h-5 w-5" />,
+    icon: <Component className="h-5 w-5" />,
     defaultOpen: true,
     pages: [
       {
@@ -21,107 +21,135 @@ export const sidebarNav = [
     ],
   },
   {
-    title: 'Components',
-    icon: <Component className="h-5 w-5" />,
+    title: 'Core Framework',
+    icon: <Code className="h-5 w-5" />,
     defaultOpen: false,
     pages: [
       {
-        title: 'Button',
-        href: '/docs/components/button',
+        title: 'Application Structure',
+        href: '/docs/core/application',
       },
       {
-        title: 'Input',
-        href: '/docs/components/input',
+        title: 'Configuration',
+        href: '/docs/core/configuration',
       },
       {
-        title: 'Label',
-        href: '/docs/components/label',
+        title: 'Middleware Stack',
+        href: '/docs/core/middleware',
       },
       {
-        title: 'Checkbox',
-        href: '/docs/components/checkbox',
+        title: 'Utilities',
+        href: '/docs/core/utilities',
       },
       {
-        title: 'Search Button',
-        href: '/docs/components/search-button',
-      },
-      {
-        title: 'Tabs',
-        href: '/docs/components/tabs',
-      },
-      {
-        title: 'Sidebar',
-        href: '/docs/components/sidebar',
-      },
-      {
-        title: 'Steps',
-        href: '/docs/components/steps',
-      },
-      {
-        title: 'Syntax Highlighter',
-        href: '/docs/components/syntax-highlighter',
-      },
-      {
-        title: 'Folder Tree',
-        href: '/docs/components/folder-tree',
-      },
-      {
-        title: 'Note',
-        href: '/docs/components/note',
-      },
-      {
-        title: 'Menu',
-        href: '/docs/components/menu',
-      },
-      {
-        title: 'Popover',
-        href: '/docs/components/popover',
-      },
-      {
-        title: 'Dialog',
-        href: '/docs/components/dialog',
-      },
-      {
-        title: 'Select',
-        href: '/docs/components/select',
+        title: 'WebSocket & gRPC',
+        href: '/docs/core/websocket-grpc',
       },
     ],
   },
   {
-    title: 'Customization',
+    title: 'CLI Commands',
     icon: <Wrench className="h-5 w-5" />,
-    defaultOpen: true,
+    defaultOpen: false,
     pages: [
       {
-        title: 'Sidebar',
-        href: '/docs/customization/sidebar',
+        title: 'CLI Overview',
+        href: '/docs/cli/overview',
       },
       {
-        title: 'Toc',
-        href: '/docs/customization/toc',
-      },
-      {
-        title: 'Font',
-        href: '/docs/customization/font',
-      },
-      {
-        title: 'SEO and Social Sharing',
-        href: '/docs/customization/seo-and-social-sharing',
+        title: 'Docker & Services',
+        href: '/docs/cli/docker-services',
       },
     ],
   },
   {
-    title: 'Theme',
-    icon: <Paintbrush className="h-5 w-5" />,
-    defaultOpen: true,
-    href: '/docs/theme',
-    pages: [],
+    title: 'Database',
+    icon: <Database className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'Models & Relationships',
+        href: '/docs/database/models',
+      },
+      {
+        title: 'Migrations',
+        href: '/docs/database/migrations',
+      },
+      {
+        title: 'Seeders',
+        href: '/docs/database/seeders',
+      },
+    ],
   },
   {
-    title: 'Search Bar',
-    icon: <Search className="h-5 w-5" />,
-    defaultOpen: true,
-    href: '/docs/search-bar',
-    pages: [],
+    title: 'Authentication',
+    icon: <Shield className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'JWT Tokens',
+        href: '/docs/authentication/jwt',
+      },
+      {
+        title: 'RBAC',
+        href: '/docs/authentication/rbac',
+      },
+    ],
+  },
+  {
+    title: 'API Development',
+    icon: <Server className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'Request Validation',
+        href: '/docs/api/validation',
+      },
+      {
+        title: 'Swagger Documentation',
+        href: '/docs/api/swagger',
+      },
+    ],
+  },
+  {
+    title: 'Monitoring',
+    icon: <Activity className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'Overview',
+        href: '/docs/monitoring/overview',
+      },
+      {
+        title: 'Health Checks',
+        href: '/docs/monitoring/health',
+      },
+    ],
+  },
+  {
+    title: 'Deployment',
+    icon: <Container className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'Docker',
+        href: '/docs/deployment/docker',
+      },
+      {
+        title: 'Kubernetes',
+        href: '/docs/deployment/kubernetes',
+      },
+    ],
+  },
+  {
+    title: 'Contributing',
+    icon: <Users className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'Testing',
+        href: '/docs/contributing/testing',
+      },
+    ],
   },
 ];

@@ -1,0 +1,1412 @@
+---
+title: "Docker & Services Management"
+description: "Manage Docker installation and service containers"
+---
+
+# Docker & Services Management
+
+Mithril provides comprehensive Docker and service management commands to help you quickly set up and manage your development environment.
+
+## Docker Installation
+
+### Install Docker
+
+```bash
+# Install Docker using official script
+go run . artisan docker:install
+
+# Install Docker with dry-run (see what will be executed)
+go run . artisan docker:install --dry-run
+
+# Install specific Docker version
+go run . artisan docker:install --version=20.10
+```
+
+**What it does:**
+- Downloads and executes the official Docker installation script
+- Installs Docker CE, Docker CLI, and Docker Compose
+- Configures Docker to run as a service
+- Adds current user to docker group (requires logout/login)
+
+### Check Docker Status
+
+```bash
+# Check if Docker is installed and running
+go run . artisan docker:status
+
+# Show Docker version information
+go run . artisan docker:version
+
+# Show Docker system information
+go run . artisan docker:info
+```
+
+## Service Management
+
+### Start Services
+
+```bash
+# Start all services
+go run . artisan services:start
+
+# Start specific service
+go run . artisan services:start postgres
+go run . artisan services:start mongodb
+go run . artisan services:start redis
+go run . artisan services:start rabbitmq
+
+# Start multiple services
+go run . artisan services:start postgres redis rabbitmq
+
+# Start with custom configuration
+go run . artisan services:start --env=production
+```
+
+### Stop Services
+
+```bash
+# Stop all services
+go run . artisan services:stop
+
+# Stop specific service
+go run . artisan services:stop postgres
+go run . artisan services:stop mongodb
+
+# Stop multiple services
+go run . artisan services:stop postgres redis
+
+# Force stop (kill containers)
+go run . artisan services:stop --force
+```
+
+### Restart Services
+
+```bash
+# Restart all services
+go run . artisan services:restart
+
+# Restart specific service
+go run . artisan services:restart postgres
+go run . artisan services:restart redis
+
+# Restart with rebuild
+go run . artisan services:restart --rebuild
+```
+
+### Service Status
+
+```bash
+# Show status of all services
+go run . artisan services:status
+
+# Show status of specific service
+go run . artisan services:status postgres
+
+# Show detailed status with logs
+go run . artisan services:status --verbose
+```
+
+## Database Services
+
+### PostgreSQL
+
+```bash
+# Start PostgreSQL
+go run . artisan db:start postgres
+
+# Stop PostgreSQL
+go run . artisan db:stop postgres
+
+# Restart PostgreSQL
+go run . artisan db:restart postgres
+
+# Show PostgreSQL logs
+go run . artisan db:logs postgres
+
+# Access PostgreSQL shell
+go run . artisan db:shell postgres
+
+# Backup PostgreSQL database
+go run . artisan db:backup postgres --output=backup.sql
+
+# Restore PostgreSQL database
+go run . artisan db:restore postgres --file=backup.sql
+```
+
+**Default Configuration:**
+- **Image**: postgres:15-alpine
+- **Port**: 5432
+- **Username**: postgres
+- **Database**: mithril
+- **Web UI**: PgAdmin at http://localhost:8080
+
+### MongoDB
+
+```bash
+# Start MongoDB
+go run . artisan db:start mongodb
+
+# Stop MongoDB
+go run . artisan db:stop mongodb
+
+# Restart MongoDB
+go run . artisan db:restart mongodb
+
+# Show MongoDB logs
+go run . artisan db:logs mongodb
+
+# Access MongoDB shell
+go run . artisan db:shell mongodb
+
+# Backup MongoDB database
+go run . artisan db:backup mongodb --output=backup.gz
+
+# Restore MongoDB database
+go run . artisan db:restore mongodb --file=backup.gz
+```
+
+**Default Configuration:**
+- **Image**: mongo:7.0
+- **Port**: 27017
+- **Username**: admin
+- **Database**: mithril
+- **Web UI**: Mongo Express at http://localhost:8082
+
+### MySQL
+
+```bash
+# Start MySQL
+go run . artisan db:start mysql
+
+# Stop MySQL
+go run . artisan db:stop mysql
+
+# Restart MySQL
+go run . artisan db:restart mysql
+
+# Show MySQL logs
+go run . artisan db:logs mysql
+
+# Access MySQL shell
+go run . artisan db:shell mysql
+
+# Backup MySQL database
+go run . artisan db:backup mysql --output=backup.sql
+
+# Restore MySQL database
+go run . artisan db:restore mysql --file=backup.sql
+```
+
+**Default Configuration:**
+- **Image**: mysql:8.0
+- **Port**: 3306
+- **Username**: root
+- **Database**: mithril
+- **Web UI**: Adminer at http://localhost:8081
+
+### MariaDB
+
+```bash
+# Start MariaDB
+go run . artisan db:start mariadb
+
+# Stop MariaDB
+go run . artisan db:stop mariadb
+
+# Restart MariaDB
+go run . artisan db:restart mariadb
+
+# Show MariaDB logs
+go run . artisan db:logs mariadb
+
+# Access MariaDB shell
+go run . artisan db:shell mariadb
+
+# Backup MariaDB database
+go run . artisan db:backup mariadb --output=backup.sql
+
+# Restore MariaDB database
+go run . artisan db:restore mariadb --file=backup.sql
+```
+
+**Default Configuration:**
+- **Image**: mariadb:11.2
+- **Port**: 3307
+- **Username**: root
+- **Database**: mithril
+- **Web UI**: Adminer at http://localhost:8081
+
+### Oracle Database
+
+```bash
+# Start Oracle Database (Express Edition)
+go run . artisan db:start oracle
+
+# Stop Oracle Database
+go run . artisan db:stop oracle
+
+# Restart Oracle Database
+go run . artisan db:restart oracle
+
+# Show Oracle logs
+go run . artisan db:logs oracle
+
+# Access Oracle SQL*Plus shell
+go run . artisan db:shell oracle
+
+# Backup Oracle database
+go run . artisan db:backup oracle --output=backup.dmp
+
+# Restore Oracle database
+go run . artisan db:restore oracle --file=backup.dmp
+```
+
+**Default Configuration:**
+- **Image**: gvenzl/oracle-xe:latest
+- **Port**: 1521
+- **Username**: system
+- **Password**: Auto-generated
+- **Database**: XEPDB1
+- **Web UI**: Oracle APEX at http://localhost:8085
+
+**Note**: Oracle XE is free for development but has limitations (12GB data, 2GB RAM, 2 CPU threads)
+
+### CockroachDB
+
+```bash
+# Start CockroachDB
+go run . artisan db:start cockroachdb
+
+# Stop CockroachDB
+go run . artisan db:stop cockroachdb
+
+# Restart CockroachDB
+go run . artisan db:restart cockroachdb
+
+# Show CockroachDB logs
+go run . artisan db:logs cockroachdb
+
+# Access CockroachDB SQL shell
+go run . artisan db:shell cockroachdb
+
+# Backup CockroachDB database
+go run . artisan db:backup cockroachdb --output=backup.sql
+
+# Restore CockroachDB database
+go run . artisan db:restore cockroachdb --file=backup.sql
+
+# Show CockroachDB cluster status
+go run . artisan db:status cockroachdb
+```
+
+**Default Configuration:**
+- **Image**: cockroachdb/cockroach:latest
+- **SQL Port**: 26257
+- **HTTP Port**: 8086
+- **Username**: root
+- **Database**: mithril
+- **Web UI**: CockroachDB Console at http://localhost:8086
+
+## Search & Analytics Services
+
+### Elasticsearch
+
+```bash
+# Start Elasticsearch
+go run . artisan search:start elasticsearch
+
+# Stop Elasticsearch
+go run . artisan search:stop elasticsearch
+
+# Restart Elasticsearch
+go run . artisan search:restart elasticsearch
+
+# Show Elasticsearch logs
+go run . artisan search:logs elasticsearch
+
+# Check Elasticsearch health
+go run . artisan search:health elasticsearch
+
+# Create index
+go run . artisan search:create-index my_index
+
+# Delete index
+go run . artisan search:delete-index my_index
+
+# List all indices
+go run . artisan search:list-indices
+
+# Reindex data
+go run . artisan search:reindex --source=old_index --dest=new_index
+```
+
+**Default Configuration:**
+- **Image**: elasticsearch:8.11.3
+- **HTTP Port**: 9200
+- **Transport Port**: 9300
+- **Username**: elastic
+- **Password**: Auto-generated
+- **Web UI**: Kibana at http://localhost:5601
+
+**With Kibana:**
+```bash
+# Start Elasticsearch with Kibana
+go run . artisan search:start elasticsearch --with-kibana
+
+# Access Kibana
+open http://localhost:5601
+```
+
+### OpenSearch (Open Source Alternative to Elasticsearch)
+
+```bash
+# Start OpenSearch
+go run . artisan search:start opensearch
+
+# Stop OpenSearch
+go run . artisan search:stop opensearch
+
+# Access OpenSearch Dashboards
+go run . artisan search:dashboards opensearch
+```
+
+**Default Configuration:**
+- **Image**: opensearchproject/opensearch:latest
+- **HTTP Port**: 9201
+- **Username**: admin
+- **Password**: Auto-generated
+- **Web UI**: OpenSearch Dashboards at http://localhost:5602
+
+## Vector Database Services
+
+### Qdrant (Vector Search Engine)
+
+```bash
+# Start Qdrant
+go run . artisan vector:start qdrant
+
+# Stop Qdrant
+go run . artisan vector:stop qdrant
+
+# Restart Qdrant
+go run . artisan vector:restart qdrant
+
+# Show Qdrant logs
+go run . artisan vector:logs qdrant
+
+# Create collection
+go run . artisan vector:create-collection my_collection --dimension=384
+
+# Delete collection
+go run . artisan vector:delete-collection my_collection
+
+# List collections
+go run . artisan vector:list-collections
+
+# Show collection info
+go run . artisan vector:info my_collection
+```
+
+**Default Configuration:**
+- **Image**: qdrant/qdrant:latest
+- **HTTP Port**: 6333
+- **gRPC Port**: 6334
+- **Web UI**: Qdrant Dashboard at http://localhost:6333/dashboard
+
+### Milvus (Vector Database)
+
+```bash
+# Start Milvus (includes etcd and MinIO)
+go run . artisan vector:start milvus
+
+# Stop Milvus
+go run . artisan vector:stop milvus
+
+# Restart Milvus
+go run . artisan vector:restart milvus
+
+# Show Milvus logs
+go run . artisan vector:logs milvus
+
+# Check Milvus status
+go run . artisan vector:status milvus
+
+# Create collection
+go run . artisan vector:create-collection my_collection --dimension=768
+
+# List collections
+go run . artisan vector:list-collections
+```
+
+**Default Configuration:**
+- **Image**: milvusdb/milvus:latest
+- **Port**: 19530
+- **HTTP Port**: 9091
+- **Web UI**: Attu (Milvus Admin) at http://localhost:3000
+
+### Weaviate (Vector Search Engine)
+
+```bash
+# Start Weaviate
+go run . artisan vector:start weaviate
+
+# Stop Weaviate
+go run . artisan vector:stop weaviate
+
+# Restart Weaviate
+go run . artisan vector:restart weaviate
+
+# Show Weaviate logs
+go run . artisan vector:logs weaviate
+
+# Check Weaviate status
+go run . artisan vector:status weaviate
+
+# Create schema
+go run . artisan vector:create-schema --file=schema.json
+
+# List classes
+go run . artisan vector:list-classes
+```
+
+**Default Configuration:**
+- **Image**: semitechnologies/weaviate:latest
+- **HTTP Port**: 8087
+- **gRPC Port**: 50051
+- **Web UI**: Weaviate Console at http://localhost:8087/v1/console
+
+### ChromaDB (AI-native Vector Database)
+
+```bash
+# Start ChromaDB
+go run . artisan vector:start chromadb
+
+# Stop ChromaDB
+go run . artisan vector:stop chromadb
+
+# Restart ChromaDB
+go run . artisan vector:restart chromadb
+
+# Show ChromaDB logs
+go run . artisan vector:logs chromadb
+
+# List collections
+go run . artisan vector:list-collections chromadb
+
+# Create collection
+go run . artisan vector:create-collection my_collection
+```
+
+**Default Configuration:**
+- **Image**: chromadb/chroma:latest
+- **Port**: 8000
+- **Persistence**: Enabled
+
+### Pinecone Alternative (pgvector with PostgreSQL)
+
+```bash
+# Start PostgreSQL with pgvector extension
+go run . artisan vector:start pgvector
+
+# Stop pgvector
+go run . artisan vector:stop pgvector
+
+# Create vector table
+go run . artisan vector:create-table embeddings --dimension=1536
+```
+
+**Default Configuration:**
+- **Image**: ankane/pgvector:latest
+- **Port**: 5433
+- **Extension**: pgvector enabled
+
+## Cache Services
+
+### Redis
+
+```bash
+# Start Redis
+go run . artisan cache:start redis
+
+# Stop Redis
+go run . artisan cache:stop redis
+
+# Restart Redis
+go run . artisan cache:restart redis
+
+# Show Redis logs
+go run . artisan cache:logs redis
+
+# Access Redis CLI
+go run . artisan cache:cli redis
+
+# Flush Redis cache
+go run . artisan cache:flush redis
+
+# Show Redis info
+go run . artisan cache:info redis
+```
+
+**Default Configuration:**
+- **Image**: redis:7-alpine
+- **Port**: 6379
+- **Persistence**: Enabled
+
+### Memcached
+
+```bash
+# Start Memcached
+go run . artisan cache:start memcached
+
+# Stop Memcached
+go run . artisan cache:stop memcached
+
+# Show Memcached stats
+go run . artisan cache:stats memcached
+```
+
+**Default Configuration:**
+- **Image**: memcached:1.6-alpine
+- **Port**: 11211
+
+## Queue Services
+
+### RabbitMQ
+
+```bash
+# Start RabbitMQ
+go run . artisan queue:start rabbitmq
+
+# Stop RabbitMQ
+go run . artisan queue:stop rabbitmq
+
+# Restart RabbitMQ
+go run . artisan queue:restart rabbitmq
+
+# Show RabbitMQ logs
+go run . artisan queue:logs rabbitmq
+
+# Show RabbitMQ status
+go run . artisan queue:status rabbitmq
+
+# Purge all queues
+go run . artisan queue:purge rabbitmq
+```
+
+**Default Configuration:**
+- **Image**: rabbitmq:3-management-alpine
+- **AMQP Port**: 5672
+- **Management UI**: http://localhost:15672
+- **Username**: admin
+- **Virtual Host**: /
+
+### Kafka
+
+```bash
+# Start Kafka (includes Zookeeper)
+go run . artisan queue:start kafka
+
+# Stop Kafka
+go run . artisan queue:stop kafka
+
+# Show Kafka topics
+go run . artisan queue:topics kafka
+
+# Create Kafka topic
+go run . artisan queue:create-topic kafka --name=events --partitions=3
+```
+
+**Default Configuration:**
+- **Image**: confluentinc/cp-kafka:latest
+- **Port**: 9092
+- **Zookeeper Port**: 2181
+
+## Observability & Monitoring Services
+
+### OpenTelemetry Collector
+
+```bash
+# Start OpenTelemetry Collector
+go run . artisan observability:start otel-collector
+
+# Stop OpenTelemetry Collector
+go run . artisan observability:stop otel-collector
+
+# Restart OpenTelemetry Collector
+go run . artisan observability:restart otel-collector
+
+# Show OpenTelemetry logs
+go run . artisan observability:logs otel-collector
+
+# Validate configuration
+go run . artisan observability:validate-config otel-collector
+
+# Show metrics
+go run . artisan observability:metrics otel-collector
+```
+
+**Default Configuration:**
+- **Image**: otel/opentelemetry-collector-contrib:latest
+- **OTLP gRPC Port**: 4317
+- **OTLP HTTP Port**: 4318
+- **Prometheus Port**: 8888
+- **Health Check Port**: 13133
+- **Exporters**: Jaeger, Prometheus, Logging
+
+**With Full Observability Stack:**
+```bash
+# Start OpenTelemetry with Jaeger and Prometheus
+go run . artisan observability:start otel-stack
+
+# This starts:
+# - OpenTelemetry Collector
+# - Jaeger (tracing)
+# - Prometheus (metrics)
+# - Grafana (visualization)
+```
+
+### Jaeger (Distributed Tracing)
+
+```bash
+# Start Jaeger
+go run . artisan observability:start jaeger
+
+# Stop Jaeger
+go run . artisan observability:stop jaeger
+
+# Restart Jaeger
+go run . artisan observability:restart jaeger
+
+# Show Jaeger logs
+go run . artisan observability:logs jaeger
+
+# Query traces
+go run . artisan observability:query-traces --service=my-service --limit=10
+```
+
+**Default Configuration:**
+- **Image**: jaegertracing/all-in-one:latest
+- **Agent Port**: 6831 (UDP)
+- **Collector Port**: 14268
+- **Query Port**: 16686
+- **Web UI**: http://localhost:16686
+- **OTLP gRPC**: 4317
+- **OTLP HTTP**: 4318
+
+### Prometheus (Metrics)
+
+```bash
+# Start Prometheus
+go run . artisan observability:start prometheus
+
+# Stop Prometheus
+go run . artisan observability:stop prometheus
+
+# Restart Prometheus
+go run . artisan observability:restart prometheus
+
+# Show Prometheus logs
+go run . artisan observability:logs prometheus
+
+# Reload configuration
+go run . artisan observability:reload-config prometheus
+
+# Query metrics
+go run . artisan observability:query "up" --prometheus
+```
+
+**Default Configuration:**
+- **Image**: prom/prometheus:latest
+- **Port**: 9090
+- **Web UI**: http://localhost:9090
+- **Scrape Interval**: 15s
+- **Retention**: 15d
+
+### Grafana (Visualization)
+
+```bash
+# Start Grafana
+go run . artisan observability:start grafana
+
+# Stop Grafana
+go run . artisan observability:stop grafana
+
+# Restart Grafana
+go run . artisan observability:restart grafana
+
+# Show Grafana logs
+go run . artisan observability:logs grafana
+
+# Import dashboard
+go run . artisan observability:import-dashboard --file=dashboard.json
+
+# List dashboards
+go run . artisan observability:list-dashboards
+```
+
+**Default Configuration:**
+- **Image**: grafana/grafana:latest
+- **Port**: 3001
+- **Web UI**: http://localhost:3001
+- **Username**: admin
+- **Password**: Auto-generated
+- **Data Sources**: Prometheus, Jaeger, Loki
+
+### Sentry (Error Tracking)
+
+```bash
+# Start Sentry (self-hosted)
+go run . artisan observability:start sentry
+
+# Stop Sentry
+go run . artisan observability:stop sentry
+
+# Restart Sentry
+go run . artisan observability:restart sentry
+
+# Show Sentry logs
+go run . artisan observability:logs sentry
+
+# Create Sentry project
+go run . artisan observability:create-project my-project --platform=go
+
+# Get DSN
+go run . artisan observability:get-dsn my-project
+
+# Show Sentry status
+go run . artisan observability:status sentry
+```
+
+**Default Configuration:**
+- **Image**: getsentry/sentry:latest
+- **Port**: 9000
+- **Web UI**: http://localhost:9000
+- **Username**: admin@sentry.local
+- **Password**: Auto-generated on first start
+- **Services**: Web, Worker, Cron, Redis, PostgreSQL
+
+**Components Started:**
+- Sentry Web
+- Sentry Worker
+- Sentry Cron
+- Redis (for Sentry)
+- PostgreSQL (for Sentry)
+- Kafka (optional, for high-volume)
+
+**Initial Setup:**
+```bash
+# First time setup
+go run . artisan observability:start sentry --setup
+
+# This will:
+# 1. Start all Sentry services
+# 2. Run database migrations
+# 3. Create superuser
+# 4. Display login credentials
+```
+
+### Loki (Log Aggregation)
+
+```bash
+# Start Loki
+go run . artisan observability:start loki
+
+# Stop Loki
+go run . artisan observability:stop loki
+
+# Restart Loki
+go run . artisan observability:restart loki
+
+# Show Loki logs
+go run . artisan observability:logs loki
+
+# Query logs
+go run . artisan observability:query-logs --query='{app="my-app"}' --limit=100
+```
+
+**Default Configuration:**
+- **Image**: grafana/loki:latest
+- **Port**: 3100
+- **Retention**: 30d
+- **Storage**: Local filesystem
+
+### Promtail (Log Shipper for Loki)
+
+```bash
+# Start Promtail
+go run . artisan observability:start promtail
+
+# Stop Promtail
+go run . artisan observability:stop promtail
+
+# Show Promtail logs
+go run . artisan observability:logs promtail
+```
+
+**Default Configuration:**
+- **Image**: grafana/promtail:latest
+- **Port**: 9080
+- **Loki URL**: http://loki:3100
+
+### Complete Observability Stack
+
+```bash
+# Start complete observability stack
+go run . artisan observability:start --all
+
+# This starts:
+# - OpenTelemetry Collector
+# - Jaeger (tracing)
+# - Prometheus (metrics)
+# - Grafana (visualization)
+# - Loki (logs)
+# - Promtail (log shipper)
+# - Sentry (error tracking)
+
+# Stop complete stack
+go run . artisan observability:stop --all
+
+# Show stack status
+go run . artisan observability:status --all
+```
+
+**Access Points:**
+- **Grafana**: http://localhost:3001
+- **Jaeger UI**: http://localhost:16686
+- **Prometheus**: http://localhost:9090
+- **Sentry**: http://localhost:9000
+- **Loki**: http://localhost:3100
+
+## Management Tools
+
+### PgAdmin (PostgreSQL)
+
+```bash
+# Start PgAdmin
+go run . artisan tools:start pgadmin
+
+# Stop PgAdmin
+go run . artisan tools:stop pgadmin
+
+# Show PgAdmin URL
+go run . artisan tools:url pgadmin
+```
+
+**Default Configuration:**
+- **Image**: dpage/pgadmin4:latest
+- **Port**: 8080
+- **URL**: http://localhost:8080
+- **Email**: admin@mithril.dev
+- **Password**: Auto-generated (shown on first start)
+
+### Mongo Express (MongoDB)
+
+```bash
+# Start Mongo Express
+go run . artisan tools:start mongo-express
+
+# Stop Mongo Express
+go run . artisan tools:stop mongo-express
+
+# Show Mongo Express URL
+go run . artisan tools:url mongo-express
+```
+
+**Default Configuration:**
+- **Image**: mongo-express:latest
+- **Port**: 8082
+- **URL**: http://localhost:8082
+- **Username**: admin
+- **Password**: Auto-generated (shown on first start)
+
+### Adminer (Universal Database Tool)
+
+```bash
+# Start Adminer
+go run . artisan tools:start adminer
+
+# Stop Adminer
+go run . artisan tools:stop adminer
+
+# Show Adminer URL
+go run . artisan tools:url adminer
+```
+
+**Default Configuration:**
+- **Image**: adminer:latest
+- **Port**: 8081
+- **URL**: http://localhost:8081
+- **Supports**: PostgreSQL, MySQL, MongoDB, SQLite
+
+### Redis Commander
+
+```bash
+# Start Redis Commander
+go run . artisan tools:start redis-commander
+
+# Stop Redis Commander
+go run . artisan tools:stop redis-commander
+
+# Show Redis Commander URL
+go run . artisan tools:url redis-commander
+```
+
+**Default Configuration:**
+- **Image**: rediscommander/redis-commander:latest
+- **Port**: 8083
+- **URL**: http://localhost:8083
+
+## Complete Environment Management
+
+### Start Full Stack
+
+```bash
+# Start complete development environment
+go run . artisan env:start
+
+# Start with specific services
+go run . artisan env:start --services=postgres,redis,rabbitmq
+
+# Start production environment
+go run . artisan env:start --env=production
+```
+
+**What it starts:**
+- **Databases**: PostgreSQL, MongoDB, MySQL, MariaDB, Oracle XE, CockroachDB
+- **Management Tools**: PgAdmin, Mongo Express, Adminer
+- **Cache**: Redis, Memcached
+- **Queue**: RabbitMQ, Kafka
+- **Search**: Elasticsearch (with Kibana)
+- **Vector DBs**: Qdrant, ChromaDB
+- **Observability**: OpenTelemetry, Jaeger, Prometheus, Grafana, Loki, Sentry
+
+**Start specific stacks:**
+```bash
+# Start database stack only
+go run . artisan env:start --stack=databases
+
+# Start observability stack only
+go run . artisan env:start --stack=observability
+
+# Start AI/ML stack (vector databases + search)
+go run . artisan env:start --stack=ai
+
+# Start custom combination
+go run . artisan env:start --services=postgres,redis,rabbitmq,elasticsearch,qdrant,sentry
+```
+
+### Stop Full Stack
+
+```bash
+# Stop all services
+go run . artisan env:stop
+
+# Stop and remove volumes
+go run . artisan env:stop --volumes
+
+# Stop and remove everything
+go run . artisan env:stop --clean
+```
+
+### Reset Environment
+
+```bash
+# Reset all services (stop, remove, and restart)
+go run . artisan env:reset
+
+# Reset specific service
+go run . artisan env:reset postgres
+
+# Reset with data preservation
+go run . artisan env:reset --keep-data
+```
+
+### Environment Status
+
+```bash
+# Show status of all services
+go run . artisan env:status
+
+# Show detailed status
+go run . artisan env:status --verbose
+
+# Show resource usage
+go run . artisan env:status --resources
+```
+
+## Docker Compose Management
+
+### Generate Docker Compose
+
+```bash
+# Generate docker-compose.yml
+go run . artisan docker:compose:generate
+
+# Generate for specific environment
+go run . artisan docker:compose:generate --env=production
+
+# Generate with specific services
+go run . artisan docker:compose:generate --services=postgres,redis
+```
+
+### Validate Docker Compose
+
+```bash
+# Validate docker-compose.yml
+go run . artisan docker:compose:validate
+
+# Validate specific file
+go run . artisan docker:compose:validate --file=docker-compose.prod.yml
+```
+
+### View Docker Compose Config
+
+```bash
+# Show resolved docker-compose configuration
+go run . artisan docker:compose:config
+
+# Show for specific environment
+go run . artisan docker:compose:config --env=production
+```
+
+## Service Configuration
+
+### Custom Configuration
+
+You can customize service configurations through environment variables:
+
+```bash
+# PostgreSQL
+POSTGRES_VERSION=15-alpine
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-secure-password
+POSTGRES_DB=mithril
+
+# MongoDB
+MONGO_VERSION=7.0
+MONGO_PORT=27017
+MONGO_USER=admin
+MONGO_PASSWORD=your-secure-password
+MONGO_DB=mithril
+
+# Redis
+REDIS_VERSION=7-alpine
+REDIS_PORT=6379
+REDIS_PASSWORD=your-secure-password
+
+# RabbitMQ
+RABBITMQ_VERSION=3-management-alpine
+RABBITMQ_PORT=5672
+RABBITMQ_MANAGEMENT_PORT=15672
+RABBITMQ_USER=admin
+RABBITMQ_PASSWORD=your-secure-password
+
+# PgAdmin
+PGADMIN_PORT=8080
+PGADMIN_EMAIL=admin@mithril.dev
+PGADMIN_PASSWORD=your-secure-password
+
+# Mongo Express
+MONGO_EXPRESS_PORT=8082
+MONGO_EXPRESS_USER=admin
+MONGO_EXPRESS_PASSWORD=your-secure-password
+
+# MySQL
+MYSQL_VERSION=8.0
+MYSQL_PORT=3306
+MYSQL_ROOT_PASSWORD=your-secure-password
+MYSQL_DATABASE=mithril
+
+# MariaDB
+MARIADB_VERSION=11.2
+MARIADB_PORT=3307
+MARIADB_ROOT_PASSWORD=your-secure-password
+MARIADB_DATABASE=mithril
+
+# Oracle Database
+ORACLE_VERSION=latest
+ORACLE_PORT=1521
+ORACLE_PASSWORD=your-secure-password
+ORACLE_DATABASE=XEPDB1
+
+# CockroachDB
+COCKROACHDB_VERSION=latest
+COCKROACHDB_SQL_PORT=26257
+COCKROACHDB_HTTP_PORT=8086
+
+# Elasticsearch
+ELASTICSEARCH_VERSION=8.11.3
+ELASTICSEARCH_PORT=9200
+ELASTICSEARCH_PASSWORD=your-secure-password
+KIBANA_PORT=5601
+
+# Qdrant
+QDRANT_VERSION=latest
+QDRANT_HTTP_PORT=6333
+QDRANT_GRPC_PORT=6334
+
+# Milvus
+MILVUS_VERSION=latest
+MILVUS_PORT=19530
+MILVUS_HTTP_PORT=9091
+
+# Weaviate
+WEAVIATE_VERSION=latest
+WEAVIATE_HTTP_PORT=8087
+WEAVIATE_GRPC_PORT=50051
+
+# ChromaDB
+CHROMADB_VERSION=latest
+CHROMADB_PORT=8000
+
+# OpenTelemetry
+OTEL_COLLECTOR_VERSION=latest
+OTEL_GRPC_PORT=4317
+OTEL_HTTP_PORT=4318
+
+# Jaeger
+JAEGER_VERSION=latest
+JAEGER_UI_PORT=16686
+JAEGER_COLLECTOR_PORT=14268
+
+# Prometheus
+PROMETHEUS_VERSION=latest
+PROMETHEUS_PORT=9090
+
+# Grafana
+GRAFANA_VERSION=latest
+GRAFANA_PORT=3001
+GRAFANA_ADMIN_PASSWORD=your-secure-password
+
+# Sentry
+SENTRY_VERSION=latest
+SENTRY_PORT=9000
+SENTRY_SECRET_KEY=auto-generated
+SENTRY_POSTGRES_PASSWORD=your-secure-password
+
+# Loki
+LOKI_VERSION=latest
+LOKI_PORT=3100
+```
+
+### Service Templates
+
+```bash
+# List available service templates
+go run . artisan services:templates
+
+# Show template details
+go run . artisan services:template postgres
+
+# Create custom template
+go run . artisan services:template:create my-custom-service
+```
+
+## Logs Management
+
+### View Logs
+
+```bash
+# View logs for all services
+go run . artisan logs
+
+# View logs for specific service
+go run . artisan logs postgres
+
+# Follow logs (tail -f)
+go run . artisan logs postgres --follow
+
+# Show last N lines
+go run . artisan logs postgres --tail=100
+
+# Show logs since timestamp
+go run . artisan logs postgres --since=2024-01-01T00:00:00
+```
+
+### Export Logs
+
+```bash
+# Export logs to file
+go run . artisan logs:export --output=logs.txt
+
+# Export logs for specific service
+go run . artisan logs:export postgres --output=postgres.log
+
+# Export with timestamp
+go run . artisan logs:export --output=logs-$(date +%Y%m%d).txt
+```
+
+## Volume Management
+
+### List Volumes
+
+```bash
+# List all volumes
+go run . artisan volumes:list
+
+# List volumes for specific service
+go run . artisan volumes:list postgres
+```
+
+### Backup Volumes
+
+```bash
+# Backup all volumes
+go run . artisan volumes:backup
+
+# Backup specific volume
+go run . artisan volumes:backup postgres_data --output=postgres_backup.tar.gz
+```
+
+### Restore Volumes
+
+```bash
+# Restore volume from backup
+go run . artisan volumes:restore postgres_data --file=postgres_backup.tar.gz
+```
+
+### Clean Volumes
+
+```bash
+# Remove unused volumes
+go run . artisan volumes:clean
+
+# Remove all volumes (dangerous!)
+go run . artisan volumes:clean --all --force
+```
+
+## Network Management
+
+### List Networks
+
+```bash
+# List all networks
+go run . artisan networks:list
+
+# Show network details
+go run . artisan networks:inspect mithril_network
+```
+
+### Create Network
+
+```bash
+# Create custom network
+go run . artisan networks:create my_network
+
+# Create with specific driver
+go run . artisan networks:create my_network --driver=bridge
+```
+
+## Health Checks
+
+### Check Service Health
+
+```bash
+# Check health of all services
+go run . artisan health:check services
+
+# Check specific service
+go run . artisan health:check postgres
+
+# Continuous health monitoring
+go run . artisan health:monitor --interval=30s
+```
+
+### Service Diagnostics
+
+```bash
+# Run diagnostics on service
+go run . artisan diagnostics postgres
+
+# Run full system diagnostics
+go run . artisan diagnostics --all
+
+# Export diagnostics report
+go run . artisan diagnostics --output=diagnostics.json
+```
+
+## Best Practices
+
+### 1. **Security**
+- Always change default passwords
+- Use strong passwords for production
+- Don't expose database ports publicly
+- Use environment variables for sensitive data
+
+### 2. **Performance**
+- Allocate appropriate resources to containers
+- Use volumes for persistent data
+- Monitor resource usage regularly
+- Clean up unused containers and volumes
+
+### 3. **Development**
+- Use docker-compose for local development
+- Keep development and production configs separate
+- Use health checks for all services
+- Implement proper logging
+
+### 4. **Maintenance**
+- Regularly update service images
+- Backup data before major changes
+- Monitor logs for errors
+- Keep docker-compose files in version control
+
+## Troubleshooting
+
+### Common Issues
+
+#### Docker Not Running
+
+```bash
+# Check Docker status
+go run . artisan docker:status
+
+# Start Docker service
+sudo systemctl start docker
+
+# Enable Docker on boot
+sudo systemctl enable docker
+```
+
+#### Port Already in Use
+
+```bash
+# Find process using port
+lsof -i :5432
+
+# Kill process
+kill -9 <PID>
+
+# Or use different port
+POSTGRES_PORT=5433 go run . artisan db:start postgres
+```
+
+#### Container Won't Start
+
+```bash
+# Check container logs
+go run . artisan logs postgres
+
+# Remove and recreate container
+go run . artisan services:stop postgres --force
+go run . artisan services:start postgres
+```
+
+#### Permission Denied
+
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Logout and login again
+# Or use newgrp
+newgrp docker
+```
+
+## Next Steps
+
+- [Database Configuration](/docs/database/models)
+- [Queue Configuration](/docs/queue/overview)
+- [Deployment](/docs/deployment/docker)
+- [Monitoring](/docs/monitoring/overview)
