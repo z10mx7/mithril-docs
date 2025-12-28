@@ -72,7 +72,6 @@ hello-mithril/
 │   └── modules/             # Django-style modules
 ├── config/                  # Configuration files
 ├── database/
-│   ├── migrations/          # Database migrations
 │   └── seeders/            # Database seeders
 ├── routes/
 │   ├── api.go              # API routes
@@ -192,40 +191,52 @@ type User struct {
 }
 ```
 
-### 2. Create a Migration
+### 2. Register Models for Migration
 
-```bash
-# Generate a migration
-go run . artisan make:migration create_users_table
-```
-
-This creates a migration file in `database/migrations/`:
+Mithril uses GORM's AutoMigrate feature. Register your models in the model file:
 
 ```go
-package migrations
+// app/models/user.go
+package models
 
 import (
+    "time"
+    "github.com/google/uuid"
+    "github.com/mithril-framework/mithril/pkg/database/migration"
     "gorm.io/gorm"
-    "hello-mithril/app/models"
 )
 
-type CreateUsersTable struct{}
-
-func (m *CreateUsersTable) Up(db *gorm.DB) error {
-    return db.AutoMigrate(&models.User{})
+type User struct {
+    ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+    Email     string    `json:"email" gorm:"uniqueIndex;not null"`
+    Name      string    `json:"name" gorm:"not null"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
-func (m *CreateUsersTable) Down(db *gorm.DB) error {
-    return db.Migrator().DropTable(&models.User{})
+// Register the model for AutoMigrate
+func init() {
+    migration.RegisterModel(&User{})
 }
 ```
+
+**Alternative**: You can also call `db.AutoMigrate()` directly in your application code instead of using the registry.
 
 ### 3. Run the Migration
 
 ```bash
-# Run migrations
+# Run migrations (GORM AutoMigrate)
 go run . artisan migrate
 ```
+
+GORM AutoMigrate will automatically:
+- Create tables if they don't exist
+- Add missing columns
+- Add missing indexes
+- Add missing foreign keys
+
+**Note**: GORM AutoMigrate won't delete unused columns or change column types for safety.
 
 ### 4. Create a Seeder
 
@@ -285,7 +296,9 @@ This creates a complete blog module with:
 - Schemas (Request/response validation)
 - Views (HTML templates)
 
-### 2. Run Migrations
+### 2. Register and Run Migrations
+
+Make sure to register any new models in their `init()` functions, then run:
 
 ```bash
 # Run migrations for the new module
@@ -357,8 +370,7 @@ go run . artisan make:middleware AuthMiddleware
 go run . artisan make:request CreateProductRequest
 
 # Database operations
-go run . artisan migrate:status
-go run . artisan migrate:rollback
+go run . artisan migrate
 go run . artisan db:backup
 
 # Queue operations
@@ -381,7 +393,7 @@ Now that you have a basic Mithril application running, here's what you can explo
 
 ### 2. **Database & Models**
 - [Models and Relationships](/docs/database/models)
-- [Migrations](/docs/database/migrations)
+- [GORM AutoMigrate](/docs/database/migrations)
 - [Seeders](/docs/database/seeders)
 
 ### 3. **API Development**

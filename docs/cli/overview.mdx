@@ -79,8 +79,8 @@ go run . artisan make:controller ApiController --api
 
 # Generate models
 go run . artisan make:model User
-go run . artisan make:model Product --migration
-go run . artisan make:model Category --migration --seeder
+go run . artisan make:model Product
+go run . artisan make:model Category --seeder
 
 # Generate middleware
 go run . artisan make:middleware AuthMiddleware
@@ -100,34 +100,24 @@ go run . artisan make:listener SendWelcomeEmailListener
 
 ### Database Commands
 
-#### Migrations
+#### Migrations (GORM AutoMigrate)
+
+Mithril uses GORM's AutoMigrate feature for database migrations. Simply register your models and run migrate:
 
 ```bash
-# Run migrations
+# Run migrations (AutoMigrate all registered models)
 go run . artisan migrate
 
-# Rollback migrations
-go run . artisan migrate:rollback
-go run . artisan migrate:rollback --step=3
-
-# Reset migrations
-go run . artisan migrate:reset
-
-# Refresh migrations
-go run . artisan migrate:refresh
-go run . artisan migrate:refresh --step=2
-
-# Fresh migrations (drop and recreate)
-go run . artisan migrate:fresh
-
-# Check migration status
-go run . artisan migrate:status
-
-# Create migration
-go run . artisan make:migration create_users_table
-go run . artisan make:migration add_phone_to_users_table
-go run . artisan make:migration create_posts_table --create=posts
+# Force migration without confirmation
+go run . artisan migrate --force
 ```
+
+**How it works:**
+1. Register models using `migration.RegisterModel()` in your model files' `init()` functions
+2. Run `go run . artisan migrate` to automatically migrate all registered models
+3. GORM AutoMigrate will create/update tables, columns, indexes, and foreign keys automatically
+
+**Note**: With GORM AutoMigrate, you don't need migration files. Simply update your models and run `migrate`. GORM handles schema updates automatically.
 
 #### Seeders
 
@@ -494,8 +484,9 @@ go run . artisan make:controller ProductController --resource
 
 ### 3. **Generate Related Components**
 ```bash
-# Generate model with migration and seeder
-go run . artisan make:model Product --migration --seeder
+# Generate model with seeder
+# Note: Models are automatically migrated using GORM AutoMigrate - no migration flag needed
+go run . artisan make:model Product --seeder
 
 # Generate controller with request validation
 go run . artisan make:controller ProductController --resource

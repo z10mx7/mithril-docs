@@ -133,7 +133,8 @@ nano .env
 ### 3. Set Up Database
 
 ```bash
-# Run database migrations
+# Run database migrations (GORM AutoMigrate)
+# Make sure your models are registered using migration.RegisterModel() in their init() functions
 go run . artisan migrate
 
 # Seed the database (optional)
@@ -170,7 +171,6 @@ my-awesome-app/
 │   └── modules/             # Django-style modules
 ├── config/                  # Configuration files
 ├── database/
-│   ├── migrations/          # Database migrations
 │   └── seeders/            # Database seeders
 ├── routes/
 │   ├── api.go              # API routes
