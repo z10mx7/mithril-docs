@@ -1,27 +1,39 @@
 ---
-title: "Introduction"
-description: "Welcome to Mithril - A batteries-included web framework for Go"
+title: 'Introduction'
+description: 'Welcome to Mithril - A batteries-included web framework for Go'
 ---
 
 # Welcome to Mithril
 
-Mithril is a batteries-included web framework built on top of Fiber v2 with features that inspired from famus frameworks like FastAPI, Django, Express, Nest and Laravel. It brings the developer experience of modern frameworks to the Go ecosystem, providing everything you need to build production-ready web applications.
+Mithril is a batteries-included AI-Friendly Golang web framework built on top of Fiber with features that inspired from famus frameworks like FastAPI, Django, Express, Nest and Laravel. It brings the developer experience of modern frameworks to the Go ecosystem, providing everything you need to build production-ready web applications.
 
 ## Why Mithril?
 
 ### 🚀 **Developer Experience**
+
 - **Amazing CLI**: Global CLI tool (`mithril new project`) + local commands , consider it something similar to django-admin or django manage.py or laravels artisan
-- **Code Generation**: Generate controllers, models, migrations, CRUD and more with simple commands
+- **Code Generation**: Generate CRUD (controllers, migrations and more) from your Models and Dtructs
 - **Hot Reload**: Live reload during development with Air integration
+- **Dockerized**: Production Ready and Size Optimized Docker Image with builtin Health Checks .
+- **Auto Swagger Generator**: Automaticaly Generate and Update Swagger Documents and OpenAPI Specs Using AI
+- **Database Migrations**: Advanced Database Migrations using goose , Database Seeders, Database Backup, Database Restore
+- **Database Backups**: Supports Multiplie Backup Versions From Database and Restoring them from List of Your Backups
+- **Database Seeders**: Supports Database Seeders
+- **Ready to Use Services**: mithril CLI will help you to easily Run and Manage Containers You May Need during development, including Postgres, PgAdmin, Adminer, Redis, RabbitMQ, Kafka, Minio, Rustfs, Postgresus
+- **Encryption Ultilities**: Built-in Commands for Encryption, Hashing and Encoding . including bcrypt, SHA-256, SHA-512, Base64, openssl secret
 - **Comprehensive Testing**: Built-in testing utilities and helpers
 
 ### 🏗️ **Modern Architecture**
+
 - **Fiber v2**: High-performance HTTP framework built on fasthttp
-- **GORM Integration**: Powerful ORM with migrations and multi-database support
+- **PostgreSQL Integration**: using postgresql and pgx to acheive better performance during database interactions
 - **Dependency Injection**: Laravel-style service container
+- **Reposity Pattern Ready**: Reposity Pattern is First class citizen here
+- **Faster Json Render**: mithril uses sonic for acheiving better Performance during parsing jsons
 - **Middleware Stack**: CORS, CSRF, rate limiting, sessions, and more
 
 ### 🔐 **Security First**
+
 - **Encryption**: AES Encryption and MistHash support
 - **JWT Authentication**: Access and refresh token management
 - **RBAC System**: Django Like Role-based access control with permissions
@@ -29,32 +41,37 @@ Mithril is a batteries-included web framework built on top of Fiber v2 with feat
 - **Rate Limiting**: Per-IP, per-user, and per-route rate limiting
 - **Security Headers**: Helmet-style security headers
 - **RequestID**: every request has its own unique ID to detect attacker easier
+- **CORS**: Supports Cors By default
 
 ### 📊 **Production Ready**
+
 - **Health Checks**: Built-in health check endpoints
 - **Monitoring**: Prometheus metrics and OpenTelemetry and Sentry support
 - **Logging**: Structured JSON logging with multiple levels
 - **Docker Support**: Multi-stage Dockerfile and docker-compose configurations
 - **Kubernetes**: Complete K8s deployment manifests
 - **Github Actions**: Complete Github Actions for CI/CD and Deployment Notifications
+- **GZIP**: Gzip Support by default
 
 ## Key Features
 
 ### Core Framework
+
 - **Configuration Management**: Environment-based config with validation
 - **Request/Response Validation**: FastAPI-style schema validation
-- **Auto-generated Swagger**: OpenAPI 3.0 documentation at `/docs` , Like FastAPI
+- **Auto-generated Swagger**: OpenAPI 3.0 documentation at `/docs` , Like FastAPI but Using AI
 - **Module System**: Django-style app organization
-- **Template Engine**: HTML templates with Go's `html/template`
+- **Template Engine**: HTML templates with using JET engine
 
 ### Database & Migrations
-- **Multi-database Support**: PostgreSQL, Clickhouse, MongoDB, Oracle, MySQL, SQL Server, SQLite, 
-- **GORM AutoMigrate**: Automatic schema migration based on model definitions - no migration files needed
-- **Database Seeding**: Populate databases with test data
-- **Backup & Restore**: Full database backup and restore functionality, like Django but more advanced 
+
+- **Goose AutoMigrate**: Automatic schema migration based on model/struct definitions using goose
+- **Database Seeding**: Populate database with test/dummy/init data
+- **Backup & Restore**: Full database backup and restore functionality, like Django but more advanced
 - **UUID Primary Keys**: Secure, globally unique identifiers by default
 
 ### Authentication & Authorization
+
 - **JWT Tokens**: Secure JSON Web Token authentication
 - **Session Management**: Database-backed session storage
 - **2FA Support**: TOTP authenticator apps
@@ -63,43 +80,45 @@ Mithril is a batteries-included web framework built on top of Fiber v2 with feat
 - **RBAC**: Role-based access control with roles and permissions
 - **RequestID**: every request has its own unique ID to make easier Debugging user issues even in Production
 
-
-
 ### File Storage
-- **Object Storage**: AWS S3 Integration and MinIO Support, no more Local Storage at all
-- **File Operations**: Upload, download, stream, list, and delete files and folders using builtin Filemanagement API
-- **Backup/Restore**: Storage backup and restore functionality
+
+- **Object Storage**: AWS S3 Integration, MinIO/RustFS Support, no more Local Storage at all
+- **File Operations**: Upload, download, stream, list, and delete files and folders using builtin File Management API
+- **Backup/Restore**: Storage backup and restore functionality on remote/local target using single command
 
 ### Background Jobs
+
 - **Queue System**: RabbitMQ, Kafka, Memory and Redis support
 - **Task Scheduling**: Cron-like scheduling with recurring tasks with monitoring tools for queue
 - **Job Retries**: Automatic retry with exponential backoff
 - **Failed Job Handling**: Dead letter queue and retry mechanisms
 
 ### Real-time Communication
-- **WebSocket Support**: Real-time communication with room management
+
+- **WebSocket Support**: Real-time communication with room management, simulating wocketio by wrapping around ws
 - **gRPC Support**: High-performance RPC communication
 - **Broadcasting**: Message broadcasting to multiple clients
 
 ### Monitoring & Observability
+
 - **Health Checks**: `/health`, `/livez`, `/readyz` endpoints
-- **Prometheus Metrics**: `/pmetrics` endpoint for monitoring
+- **System Monitoring**: `/monitor` endpoint for CPU, memory, disk, and network monitoring
 - **OpenTelemetry**: Distributed tracing support
-- **Sentry Integration**: Error tracking and monitoring
-- **System Monitoring**:  `/metrics` endpoint for CPU, memory, disk, and network monitoring
+- **Sentry Integration**: Error tracking and monitoring with both sentry and mithrilbounter
+- **Prometheus Metrics**: `/pmetrics` endpoint for monitoring !!!
 
 ## Quick Comparison
 
-| Feature | Mithril | Gin | Echo | Fiber |
-|---------|---------|-----|------|-------|
-| **Performance** | ⚡ Very High  | ⚡ High | ⚡ High | ⚡ Very High |
-| **CLI Tools** | ✅ Built-in | ❌ None | ❌ None | ❌ None |
-| **Code Generation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
-| **Migrations** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Authentication** | ✅ Complete | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Validation** | ✅ Schema-based | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Documentation** | ✅ Auto-generated | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Testing** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+| Feature             | Mithril           | Gin       | Echo      | Fiber        |
+| ------------------- | ----------------- | --------- | --------- | ------------ |
+| **Performance**     | ⚡ Very High      | ⚡ High   | ⚡ High   | ⚡ Very High |
+| **CLI Tools**       | ✅ Built-in       | ❌ None   | ❌ None   | ❌ None      |
+| **Code Generation** | ✅ Yes            | ❌ No     | ❌ No     | ❌ No        |
+| **Migrations**      | ✅ Built-in       | ❌ Manual | ❌ Manual | ❌ Manual    |
+| **Authentication**  | ✅ Complete       | ❌ Manual | ❌ Manual | ❌ Manual    |
+| **Validation**      | ✅ Schema-based   | ❌ Manual | ❌ Manual | ❌ Manual    |
+| **Documentation**   | ✅ Auto-generated | ❌ Manual | ❌ Manual | ❌ Manual    |
+| **Testing**         | ✅ Built-in       | ❌ Manual | ❌ Manual | ❌ Manual    |
 
 ## What's Next?
 
@@ -110,7 +129,7 @@ Ready to get started? Here's what you can do next:
 3. **[Core Concepts](/docs/core/application)** - Learn about the core framework concepts
 4. **[CLI Commands](/docs/cli/overview)** - Explore the powerful CLI tools
 5. **[Examples](/docs/examples/basic-api)** - See Mithril in action
-5. **[Examples](/docs/examples/basic-api)** - See Mithril Video Courses
+6. **[Examples](/docs/examples/basic-api)** - See Mithril Video Courses
 
 ## Community & Support
 
