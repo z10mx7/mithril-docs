@@ -143,62 +143,38 @@ mithril-rev/
 
 Let's create a simple API endpoint to get familiar with Mithril:
 
-### 1. Create a Controller
+### 1. Create a Route
 
-```bash
-# Generate a new controller
-go run . artisan make:controller HelloController
-```
-
-This creates `app/controllers/hello_controller.go`:
-
-```go
-package controllers
-
-import (
-    "github.com/gofiber/fiber/v2"
-)
-
-type HelloController struct{}
-
-func NewHelloController() *HelloController {
-    return &HelloController{}
-}
-
-func (c *HelloController) Index(ctx *fiber.Ctx) error {
-    return ctx.JSON(fiber.Map{
-        "message": "Hello from Mithril!",
-        "version": "1.0.0-alpha",
-        "timestamp": time.Now().Unix(),
-    })
-}
-```
-
-### 2. Create a Route
-
-Edit `routes/api.go`:
+Edit `routes/new.go`:
 
 ```go
 package routes
 
-import (
-    "github.com/gofiber/fiber/v2"
-    "hello-mithril/app/controllers"
-)
+import "github.com/gofiber/fiber/v2"
 
-func SetupAPIRoutes(app *fiber.App) {
-    api := app.Group("/api")
-
-    helloController := controllers.NewHelloController()
-
-    api.Get("/hello", helloController.Index)
+// SetupNewRoutes registers new public API routes.
+func SetupNewRoutes(app *fiber.App) {
+	app.Get("/api/hello", func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": "Hello from Mithril!",
+		})
+	})
 }
+
+```
+
+Add it to `routes/register.go`, right after `SetupCoreRoutes(app, pool)`:
+
+```go
+SetupNewRoutes(app)
 ```
 
 ### 3. Test Your Endpoint
 
+in your browser go to http://localhost:3000/api/hello
+
 ```bash
-# Test the endpoint
+# OR
 curl http://localhost:3000/api/hello
 ```
 
@@ -206,9 +182,7 @@ You should see:
 
 ```json
 {
-  "message": "Hello from Mithril!",
-  "version": "1.0.0-alpha",
-  "timestamp": 1704067200
+  "message": "Hello from Mithril!"
 }
 ```
 
@@ -218,273 +192,300 @@ Let's create a simple User model and see Mithril's database features:
 
 ### 1. Create a Model
 
+create a new model in database/models/Article.go
+
 ```bash
-# Generate a new model
-go run . artisan make:model User
-```
-
-This creates `app/models/user.go`:
-
-```go
 package models
 
 import (
-    "time"
-    "github.com/google/uuid"
-    "gorm.io/gorm"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-type User struct {
-    ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-    Email     string    `json:"email" gorm:"uniqueIndex;not null"`
-    Name      string    `json:"name" gorm:"not null"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+// Article represents a Article row (pgx scanning).
+type Article struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
+
+
 ```
 
-### 2. Register Models for Migration
+### 2. Generate Migration
 
-Mithril uses GORM's AutoMigrate feature. Register your models in the model file:
+Mithril uses goose to turn your models in sql file:
 
-```go
-// app/models/user.go
-package models
-
-import (
-    "time"
-    "github.com/google/uuid"
-    "github.com/mithril-framework/mithril/pkg/database/migration"
-    "gorm.io/gorm"
-)
-
-type User struct {
-    ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-    Email     string    `json:"email" gorm:"uniqueIndex;not null"`
-    Name      string    `json:"name" gorm:"not null"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
-}
-
-// Register the model for AutoMigrate
-func init() {
-    migration.RegisterModel(&User{})
-}
+```bash
+mithril migrate-gen MODEL=Article
 ```
 
-**Alternative**: You can also call `db.AutoMigrate()` directly in your application code instead of using the registry.
+it will create sql file for goose at database/migrations/0008_articles.sql
+
+```sql
+-- +goose Up
+CREATE TABLE articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_articles_author_id ON articles(author_id);
+CREATE INDEX idx_articles_created_at ON articles(created_at DESC);
+
+-- +goose Down
+DROP TABLE IF EXISTS articles;
+```
 
 ### 3. Run the Migration
 
 ```bash
-# Run migrations (GORM AutoMigrate)
-go run . artisan migrate
+# Run migrations
+mithril migrate-up
 ```
 
-GORM AutoMigrate will automatically:
-
-- Create tables if they don't exist
-- Add missing columns
-- Add missing indexes
-- Add missing foreign keys
-
-**Note**: GORM AutoMigrate won't delete unused columns or change column types for safety.
-
-### 4. Create a Seeder
+## First Crud
 
 ```bash
-# Generate a seeder
-go run . artisan make:seeder UserSeeder
-```
-
-This creates `database/seeders/user_seeder.go`:
-
-```go
-package seeders
-
-import (
-    "gorm.io/gorm"
-    "hello-mithril/app/models"
-)
-
-type UserSeeder struct{}
-
-func (s *UserSeeder) Run(db *gorm.DB) error {
-    users := []models.User{
-        {Email: "admin@example.com", Name: "Admin User"},
-        {Email: "user@example.com", Name: "Regular User"},
-    }
-
-    for _, user := range users {
-        db.Create(&user)
-    }
-
-    return nil
-}
-```
-
-### 5. Run the Seeder
-
-```bash
-# Run seeders
-go run . artisan db:seed
-```
-
-## Your First Module
-
-Let's create a complete module with CRUD operations:
-
-### 1. Create a Module
-
-```bash
-# Generate a complete module
-go run . artisan make:module blog --full
-```
-
-This creates a complete blog module with:
-
-- Models (Post, Category)
-- Controllers (PostController, CategoryController)
-- Routes (API and web routes)
-- Schemas (Request/response validation)
-- Views (HTML templates)
-
-### 2. Register and Run Migrations
-
-Make sure to register any new models in their `init()` functions, then run:
-
-```bash
-# Run migrations for the new module
-go run . artisan migrate
-```
-
-### 3. Test the Module
-
-```bash
-# Test the blog API
-curl http://localhost:3000/api/posts
-curl http://localhost:3000/api/categories
-```
-
-## Authentication Setup
-
-Let's add authentication to your application:
-
-### 1. Scaffold Authentication
-
-```bash
-# Generate authentication system
-go run . artisan make:auth
+mithril crud MODEL=User
 ```
 
 This creates:
 
-- Authentication controllers
-- JWT token management
-- Login/register routes
-- Password reset functionality
-- Email verification
+- database/repositories/blog_repositoryd.go
+- routes/crud_blog.go
+
+blog_repositoryd.go :
+
+```go
+package repositories
+
+import (
+	"context"
+
+	"github.com/mithril-framework/mithril/database/models"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// BlogRepository provides blog persistence.
+type BlogRepository struct {
+	db *pgxpool.Pool
+}
+
+// NewBlogRepository returns a new BlogRepository.
+func NewBlogRepository(db *pgxpool.Pool) *BlogRepository {
+	return &BlogRepository{db: db}
+}
+
+// Create inserts a blog.
+func (r *BlogRepository) Create(ctx context.Context, m *models.Blog) error {
+	if m.ID == uuid.Nil {
+		m.ID = uuid.New()
+	}
+	query := `
+		INSERT INTO blogs (id, title, content, author_id, is_active)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at, updated_at
+	`
+	return r.db.QueryRow(ctx, query, m.ID, m.Title, m.Content, m.AuthorID, m.IsActive).Scan(&m.CreatedAt, &m.UpdatedAt)
+}
+
+// GetByID returns a blog by id.
+func (r *BlogRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Blog, error) {
+	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs WHERE id = $1`
+	var m models.Blog
+	err := r.db.QueryRow(ctx, query, id).Scan(&m.ID, &m.Title, &m.Content, &m.AuthorID, &m.IsActive, &m.CreatedAt, &m.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// Update updates a blog by id.
+func (r *BlogRepository) Update(ctx context.Context, m *models.Blog) error {
+	query := `UPDATE blogs SET title = $1, content = $2, author_id = $3, is_active = $4, updated_at = NOW() WHERE id = $5`
+	_, err := r.db.Exec(ctx, query, m.Title, m.Content, m.AuthorID, m.IsActive, m.ID)
+	return err
+}
+
+// Delete deletes a blog by id.
+func (r *BlogRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM blogs WHERE id = $1`, id)
+	return err
+}
+
+// List returns blogs with limit and offset.
+func (r *BlogRepository) List(ctx context.Context, limit, offset int) ([]*models.Blog, error) {
+	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanBlogRows(rows)
+}
+
+// ListByAuthor returns blogs for one author.
+func (r *BlogRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID, limit, offset int) ([]*models.Blog, error) {
+	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs WHERE author_id = $3 ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.Query(ctx, query, limit, offset, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanBlogRows(rows)
+}
+
+func scanBlogRows(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+	Close()
+}) ([]*models.Blog, error) {
+	var list []*models.Blog
+	for rows.Next() {
+		var m models.Blog
+		if err := rows.Scan(&m.ID, &m.Title, &m.Content, &m.AuthorID, &m.IsActive, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, &m)
+	}
+	return list, rows.Err()
+}
+
+```
+
+crud_blog.go:
+
+```go
+package routes
+
+import (
+	"github.com/mithril-framework/mithril/database/repositories"
+	"github.com/mithril-framework/mithril/internal/acl"
+	crudhandlers "github.com/mithril-framework/mithril/internal/crud/blog"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// MountCrudBlogRoutes registers blog CRUD on an existing /api group (middleware already applied).
+func MountCrudBlogRoutes(api fiber.Router, pool *pgxpool.Pool, aclSvc *acl.Service) {
+	if pool == nil {
+		return
+	}
+	repo := repositories.NewBlogRepository(pool)
+	h := crudhandlers.NewHandlers(repo, aclSvc)
+	api.Get("/blogs", h.List)
+	api.Get("/blogs/:id", h.Get)
+	api.Post("/blogs", h.Create)
+	api.Put("/blogs/:id", h.Update)
+	api.Delete("/blogs/:id", h.Delete)
+}
+
+```
 
 ### 2. Create a Superuser
 
 ```bash
 # Create an admin user
-go run . artisan createsuperuser
+mithril createsuperuser
 ```
 
-### 3. Test Authentication
+you can sign in into admin from http://localhost:4000/admin
+
+## Update Swagger Documentation
+
+make sure put your openai api key inside .env, then :
 
 ```bash
-# Register a new user
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123","name":"Test User"}'
-
-# Login
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
+mithril swagger
 ```
+
+will Regenerate OpenAPI schema from route files
 
 ## Explore the CLI
 
 Mithril comes with a powerful CLI. Let's explore some commands:
 
 ```bash
-# List all available commands
-go run . artisan list
+mithril new PROJECT_NAME # create new project
+mithril ping # show latest ping message, some sort of version
 
-# Show help for a specific command
-go run . artisan help make:controller
+Available commands:
+mithril acl-assign-permission-role make acl-assign-permission-role ROLE_NAME=... CODENAME=...
+mithril acl-assign-permission-user make acl-assign-permission-user USER_EMAIL=... CODENAME=...
+mithril acl-assign-role make acl-assign-role USER_EMAIL=... ROLE_NAME=...
+mithril acl-permission-create make acl-permission-create CODENAME=app.perm DESC='optional'
+mithril acl-permission-delete make acl-permission-delete CODENAME=foo.bar
+mithril acl-revoke-permission-role make acl-revoke-permission-role ROLE_NAME=... CODENAME=...
+mithril acl-revoke-permission-user make acl-revoke-permission-user USER_EMAIL=... CODENAME=...
+mithril acl-revoke-role make acl-revoke-role USER_EMAIL=... ROLE_NAME=...
+mithril acl-role-create make acl-role-create NAME=editor DESC='optional description'
+mithril acl-role-delete make acl-role-delete NAME=editor
+mithril acl-superuser-set make acl-superuser-set EMAIL=user@example.com
+mithril acl-superuser-unset make acl-superuser-unset EMAIL=user@example.com
+mithril acl             Run ACL CLI: make acl ARGS='superuser set EMAIL' | ARGS='role create NAME' | ARGS='list permissions'
+mithril admin-disable   Disable admin panel (removes sentinel file; env ENABLE_ADMIN_PANEL still respected if set)
+mithril admin-enable    Enable admin panel (creates .admin-panel-enabled; or set ENABLE_ADMIN_PANEL=true)
+mithril backup-list     List backups in database/backups
+mithril backup          Create database backup (compressed SQL in database/backups). Uses pg_dump, Docker, or Go.
+mithril build-linux     Build the application for Linux
+mithril build           Build the application
+mithril clean           Clean build artifacts
+mithril createsuperuser Interactive Django-style superuser (email, password x2, names; weak-pw confirm)
+mithril crud            Generate CRUD (repository, handlers, routes) from model. Usage: make crud MODEL=User
+mithril dbms-disable    Disable DBMS (removes sentinel; unset ENABLE_DBMS in .env if set)
+mithril dbms-enable     Enable DBMS (creates .dbms-enabled; or set ENABLE_DBMS=true)
+mithril dbms            Run PostgreSQL web UI (make dbms-enable or ENABLE_DBMS=true; optional DBMS_ADDR=:5050)
+mithril dc-down         Stop and remove dev containers (keeps volumes)
+mithril dc-logs         Follow all dev containers logs
+mithril dc-run          Start all dev containers in background
+mithril dc-start        Start all stopped dev containers
+mithril dc-stop         Stop all dev containers
+mithril dc              Per-service: make dc CMD=install SVC=postgres  (CMD: install|up|start|stop|restart|logs|shell)
+mithril decode          Base64-decode (e.g. make decode hello  or  make decode S='aGVsbG8=')
+mithril docker-build    Build Docker image (tag: $(APP_NAME):latest)
+mithril encode          Base64-encode (e.g. make encode hello)
+mithril hash            Hash password with bcrypt (e.g. make hash 123)
+mithril help            Show this help message
+mithril i               Install dependencies
+mithril init-make       Symlink mithril-make to /usr/local/bin (Make wrapper: mithril-make run, …)
+mithril init            Install mithril scaffold CLI to /usr/local/bin
+mithril install-tools   Install goose CLI for migrations
+mithril install         Install dependencies
+mithril kill            Kill app on port 4000 and Air (parent of that process)
+mithril migrate-down    Run database migrations down
+mithril migrate-gen     Generate SQL migration from model. Usage: make migrate-gen MODEL=Article [NAME=custom_slug]
+mithril migrate-reset   Clear migration history and re-run all migrations (requires psql)
+mithril migrate-status  Show migration status
+mithril migrate-up      Run database migrations up (set DATABASE_URL or DB_* in .env)
+mithril new             Dogfood: scaffold from this tree. Usage: make new DEST=../myapp [ARGS='-module github.com/x/y']
+mithril restore         Restore from backup. make restore (latest) or make restore f=path/to/backup.sql.gz
+mithril routes          List all registered routes (no server start)
+mithril run-air         Alias for run-dev
+mithril run-dev         Run with live reload (Air). Use this instead of `make run dev` (that form overrode the `run` target).
+mithril run-docker      Build Docker image and run container (port 4000)
+mithril run             Run the application
+mithril secret          Generate a new JWT_SECRET and update .env
+mithril seed            Seed database (demo user). Run migrate-up first. Loads .env like migrate-*.
+mithril sha256          SHA-256 checksum (e.g. make sha256 hello)
+mithril sha512          SHA-512 checksum (e.g. make sha512 hello)
+mithril swagger         Regenerate OpenAPI schema from route files via OpenAI (OPENAI_API_KEY in .env)
+mithril test            Run tests
 
-# Generate various components
-go run . artisan make:controller ProductController
-go run . artisan make:model Product
-go run . artisan make:middleware AuthMiddleware
-go run . artisan make:request CreateProductRequest
-
-# Database operations
-go run . artisan migrate
-go run . artisan db:backup
-
-# Queue operations
-go run . artisan queue:work
-go run . artisan queue:failed
-
-# Monitoring
-go run . artisan monitor:health
-go run . artisan monitor:metrics
 ```
-
-## What's Next?
-
-Now that you have a basic Mithril application running, here's what you can explore next:
-
-### 1. **Core Concepts**
-
-- [Application Structure](/docs/core/application)
-- [Configuration Management](/docs/core/configuration)
-- [Dependency Injection](/docs/core/container)
-
-### 2. **Database & Models**
-
-- [Models and Relationships](/docs/database/models)
-- [GORM AutoMigrate](/docs/database/migrations)
-- [Seeders](/docs/database/seeders)
-
-### 3. **API Development**
-
-- [Request Validation](/docs/api/validation)
-- [Response Serialization](/docs/api/responses)
-- [Swagger Documentation](/docs/api/swagger)
-
-### 4. **Authentication**
-
-- [JWT Tokens](/docs/authentication/jwt)
-- [Role-Based Access Control](/docs/authentication/rbac)
-- [2FA Support](/docs/authentication/2fa)
-
-### 5. **Advanced Features**
-
-- [File Storage](/docs/storage/overview)
-- [Background Jobs](/docs/queue/overview)
-- [WebSocket Support](/docs/core/websocket)
-- [Monitoring](/docs/monitoring/overview)
-
-### 6. **Deployment**
-
-- [Docker Deployment](/docs/deployment/docker)
-- [Kubernetes](/docs/deployment/kubernetes)
-- [Production Setup](/docs/deployment/production)
-
-## Need Help?
-
-- **Documentation**: Browse the full documentation
-- **GitHub Issues**: Report bugs or request features
-- **Discord Community**: Join our community for help
-- **Examples**: Check out the example projects
 
 ---
 
