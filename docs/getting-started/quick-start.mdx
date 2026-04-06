@@ -1,6 +1,6 @@
 ---
-title: "Quick Start"
-description: "Create your first Mithril application in minutes"
+title: 'Quick Start'
+description: 'Create your first Mithril application in minutes'
 ---
 
 # Quick Start
@@ -13,7 +13,7 @@ Get up and running with Mithril in just a few minutes! This guide will walk you 
 
 ```bash
 # Install the global CLI tool
-go install github.com/mithril-framework/mithril/cmd/mithril@latest
+curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
 ### 2. Create a New Project
@@ -30,31 +30,37 @@ cd hello-mithril
 
 ```bash
 # Install Go dependencies
-go mod tidy
+mithril install
 ```
 
 ### 4. Configure Environment
 
 ```bash
 # Copy the example environment file
-cp .env.example .env
+cp env.example .env
 
-# The default configuration will work for this quick start
+# put your db credentials and apikeys and secrets in .env file
 ```
 
 ### 5. Start the Development Server
 
 ```bash
 # Start the development server
-go run . artisan serve
+mithril run-dev
 ```
 
 ### 6. Visit Your Application
 
 Open your browser and visit:
-- **Web Application**: http://localhost:3000
-- **API Documentation**: http://localhost:3000/docs
-- **Health Check**: http://localhost:3000/health
+
+- **Web Application**: http://localhost:4000
+- **API Documentation**: http://localhost:4000/docs
+- **Health Check**: http://localhost:4000/health
+- **Live Check**: http://localhost:4000/livez
+- **Ready Check**: http://localhost:4000/readyz
+- **Resource and Usage Monitor**: http://localhost:4000/monitor
+- **Admin Panel (need a command to run `mithril admin-enable`)**: http://localhost:4000/admin
+- **DBMS Panel (need a command to run `mithril dbms-enable && mithril dbms`)**: http://localhost:5050
 
 🎉 **Congratulations!** You've created your first Mithril application!
 
@@ -63,27 +69,74 @@ Open your browser and visit:
 Let's explore what Mithril created for you:
 
 ```
-hello-mithril/
-├── app/
-│   ├── controllers/          # HTTP controllers
-│   ├── middleware/           # Custom middleware
-│   ├── models/              # Database models
-│   ├── schemas/             # Request/response validation
-│   └── modules/             # Django-style modules
-├── config/                  # Configuration files
-├── database/
-│   └── seeders/            # Database seeders
-├── routes/
-│   ├── api.go              # API routes
-│   ├── web.go              # Web routes
-│   └── console.go          # Console commands
-├── templates/              # HTML templates
-├── utils/                  # Utility functions
-├── artisan                 # Local CLI script
-├── main.go                 # Application entry point
-├── Makefile               # Build commands
-├── Dockerfile             # Docker configuration
-└── docker-compose.*.yml   # Docker Compose files
+
+mithril-rev/
+├── cmd/                          # CLI entrypoints (acl, backup, seed, swagger, etc.)
+│   ├── acl/
+│   ├── backup/
+│   ├── createsuperuser/
+│   ├── crud/
+│   ├── dbms/
+│   ├── mithril/
+│   ├── seed/
+│   ├── swagger/
+│   └── util/
+├── internal/                     # Core application modules
+│   ├── acl/
+│   ├── admin/
+│   ├── auth/
+│   ├── cli/
+│   ├── createsuperuser/
+│   ├── crud/
+│   │   ├── blog/
+│   │   └── user/
+│   ├── db/
+│   │   └── backup/
+│   ├── dbms/
+│   ├── timezone/
+│   └── vendor/
+├── database/                     # DB layer
+│   ├── backups/
+│   ├── migrations/
+│   ├── models/
+│   ├── repositories/
+│   └── seeders/
+├── routes/                       # Route registration
+│   ├── admin.go
+│   ├── auth.go
+│   ├── core.go
+│   ├── crud_blog.go
+│   ├── crud_user.go
+│   ├── register.go
+│   ├── vendor.go
+│   └── web.go
+├── public/                       # Static/public assets
+│   ├── admin/
+│   ├── assets/
+│   └── static/
+├── pkg/                          # Reusable packages
+│   └── utils/
+├── infrastructure/               # Deployment/runtime infra
+│   ├── docker-compose.services.yml
+│   ├── k8s/
+│   ├── nginx.conf
+│   └── traefik.yaml
+├── docs/
+│   ├── backup-restore.md
+│   └── swagger.json
+├── views/
+│   └── demo.jet
+├── bin/
+├── main.go                       # Application entry point
+├── Makefile
+├── Dockerfile
+├── go.mod
+├── go.sum
+├── env.example
+├── .env
+├── install.sh
+├── locustfile.py
+└── README.md
 ```
 
 ## Your First API Endpoint
@@ -135,9 +188,9 @@ import (
 
 func SetupAPIRoutes(app *fiber.App) {
     api := app.Group("/api")
-    
+
     helloController := controllers.NewHelloController()
-    
+
     api.Get("/hello", helloController.Index)
 }
 ```
@@ -153,9 +206,9 @@ You should see:
 
 ```json
 {
-    "message": "Hello from Mithril!",
-    "version": "1.0.0-alpha",
-    "timestamp": 1704067200
+  "message": "Hello from Mithril!",
+  "version": "1.0.0-alpha",
+  "timestamp": 1704067200
 }
 ```
 
@@ -231,6 +284,7 @@ go run . artisan migrate
 ```
 
 GORM AutoMigrate will automatically:
+
 - Create tables if they don't exist
 - Add missing columns
 - Add missing indexes
@@ -262,11 +316,11 @@ func (s *UserSeeder) Run(db *gorm.DB) error {
         {Email: "admin@example.com", Name: "Admin User"},
         {Email: "user@example.com", Name: "Regular User"},
     }
-    
+
     for _, user := range users {
         db.Create(&user)
     }
-    
+
     return nil
 }
 ```
@@ -290,6 +344,7 @@ go run . artisan make:module blog --full
 ```
 
 This creates a complete blog module with:
+
 - Models (Post, Category)
 - Controllers (PostController, CategoryController)
 - Routes (API and web routes)
@@ -325,6 +380,7 @@ go run . artisan make:auth
 ```
 
 This creates:
+
 - Authentication controllers
 - JWT token management
 - Login/register routes
@@ -387,32 +443,38 @@ go run . artisan monitor:metrics
 Now that you have a basic Mithril application running, here's what you can explore next:
 
 ### 1. **Core Concepts**
+
 - [Application Structure](/docs/core/application)
 - [Configuration Management](/docs/core/configuration)
 - [Dependency Injection](/docs/core/container)
 
 ### 2. **Database & Models**
+
 - [Models and Relationships](/docs/database/models)
 - [GORM AutoMigrate](/docs/database/migrations)
 - [Seeders](/docs/database/seeders)
 
 ### 3. **API Development**
+
 - [Request Validation](/docs/api/validation)
 - [Response Serialization](/docs/api/responses)
 - [Swagger Documentation](/docs/api/swagger)
 
 ### 4. **Authentication**
+
 - [JWT Tokens](/docs/authentication/jwt)
 - [Role-Based Access Control](/docs/authentication/rbac)
 - [2FA Support](/docs/authentication/2fa)
 
 ### 5. **Advanced Features**
+
 - [File Storage](/docs/storage/overview)
 - [Background Jobs](/docs/queue/overview)
 - [WebSocket Support](/docs/core/websocket)
 - [Monitoring](/docs/monitoring/overview)
 
 ### 6. **Deployment**
+
 - [Docker Deployment](/docs/deployment/docker)
 - [Kubernetes](/docs/deployment/kubernetes)
 - [Production Setup](/docs/deployment/production)
