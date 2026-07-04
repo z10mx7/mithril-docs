@@ -269,9 +269,9 @@ Run `mithril admin-enable`, then **restart** the server.
 Another `mithril` binary is on your PATH. Install the framework CLI and prefer `$(go env GOPATH)/bin`:
 
 ```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@latest
+go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.1
 export PATH="$(go env GOPATH)/bin:$PATH"
-mithril --version   # expect: mithril 1.x.x (github.com/mithril-framework/mithril)
+mithril --version   # expect: mithril 1.0.1 (github.com/mithril-framework/mithril)
 ```
 
 Or run `sudo $(go env GOPATH)/bin/mithril init` to replace `/usr/local/bin/mithril` (removes old scaffold CLIs).
@@ -282,7 +282,8 @@ Another process is bound to `:4000` (often a previous `mithril run`):
 
 ```bash
 mithril kill
-# or: lsof -ti:4000 | xargs kill
+# requires lsof (macOS: /usr/sbin/lsof — use a full PATH if needed)
+# or: /usr/sbin/lsof -ti:4000 | xargs kill
 mithril run
 ```
 
