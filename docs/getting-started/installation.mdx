@@ -22,13 +22,15 @@ This guide installs the Mithril CLI and sets up a new project.
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-This runs `GOPROXY=direct go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.1` and verifies the installed binary. The install script bypasses stale `proxy.golang.org` cache (which may still serve v0.1.0 as `@latest`).
+This runs `GOPROXY=direct go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2` and verifies the installed binary. The install script bypasses stale `proxy.golang.org` cache (which may still serve v0.1.0 as `@latest`).
+
+If an old scaffold CLI is on `/usr/local/bin`, the script **exits with an error** until you run `sudo $(go env GOPATH)/bin/mithril init` or fix PATH — this prevents silently using the wrong binary in a new terminal.
 
 **After install**, add Go bin to your PATH (required if another `mithril` exists on the system):
 
 ```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
-mithril --version   # expect: mithril 1.0.1 (github.com/mithril-framework/mithril)
+mithril --version   # expect: mithril 1.0.2 (github.com/mithril-framework/mithril)
 ```
 
 Put that `export` in `~/.zshrc` or `~/.bashrc`. If `mithril --version` prints `dev`, run `sudo $(go env GOPATH)/bin/mithril init` or fix PATH order.
@@ -36,7 +38,7 @@ Put that `export` in `~/.zshrc` or `~/.bashrc`. If `mithril --version` prints `d
 ### Method 2: go install
 
 ```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.1
+go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2
 mithril --version
 ```
 
@@ -187,7 +189,11 @@ Mithril requires Go 1.25+. Check with `go version`.
 
 **`mithril --version` shows `dev` or scaffold output**
 
-Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.1` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
+Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
+
+**`migrate-up` says "no migrations to run" on a new project**
+
+You may be reusing a local Docker volume from an earlier Mithril project (`mithril_postgres_data`). That is normal — the database is already migrated. Run `mithril migrate-status` to confirm. For a completely fresh DB: `docker volume rm mithril_postgres_data && make dc-up-postgres`.
 
 ## Next Steps
 

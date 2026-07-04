@@ -238,6 +238,10 @@ mithril routes           # LIST_ROUTES=1 go run .
 
 ## Troubleshooting
 
+**`migrate-up` says "no migrations to run" on a new project**
+
+Your local Docker volume may already have Mithril migrations from a previous project. Run `mithril migrate-status` — if all migrations show as applied, you are ready for `mithril seed`. For a blank database: `docker volume rm mithril_postgres_data && make dc-up-postgres`.
+
 **Postgres container exits immediately**
 
 Older compose files used `POSTGRES_PASSWORD=""`, which Postgres 16 rejects on a fresh volume. Current compose uses `POSTGRES_HOST_AUTH_METHOD=trust`. Reset the volume if needed:
@@ -269,9 +273,9 @@ Run `mithril admin-enable`, then **restart** the server.
 Another `mithril` binary is on your PATH. Install the framework CLI and prefer `$(go env GOPATH)/bin`:
 
 ```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.1
+go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2
 export PATH="$(go env GOPATH)/bin:$PATH"
-mithril --version   # expect: mithril 1.0.1 (github.com/mithril-framework/mithril)
+mithril --version   # expect: mithril 1.0.2 (github.com/mithril-framework/mithril)
 ```
 
 Or run `sudo $(go env GOPATH)/bin/mithril init` to replace `/usr/local/bin/mithril` (removes old scaffold CLIs).
