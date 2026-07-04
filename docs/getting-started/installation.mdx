@@ -58,7 +58,7 @@ cd hello-mithril
 mithril install
 ```
 
-`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module (defaults to `github.com/<your-github-user>/<name>` when `gh` or `git config github.user` is set), copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository**.
+`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module (defaults to `github.com/your-user/project-name` when `gh` or `git config github.user` is set), copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository** on the `main` branch.
 
 Override the module path:
 

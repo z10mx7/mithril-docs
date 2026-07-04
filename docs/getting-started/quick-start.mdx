@@ -21,7 +21,7 @@ cd hello-mithril
 mithril install
 ```
 
-`mithril new` copies `env.example` to `.env` and sets `APP_NAME` to your project name. The Go module defaults to `github.com/<github-user>/<name>` when GitHub CLI (`gh`) or `git config github.user` is available; otherwise the folder name is used. Override with `-module`:
+`mithril new` copies `env.example` to `.env` and sets `APP_NAME` to your project name. The Go module defaults to `github.com/your-user/project-name` when GitHub CLI (`gh`) or `git config github.user` is available; otherwise the folder name is used. A tip is printed after scaffold when the module path is not under `github.com/`. Override with `-module`:
 
 ```bash
 mithril new -module github.com/acme/api my-api
