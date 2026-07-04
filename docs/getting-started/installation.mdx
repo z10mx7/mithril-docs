@@ -22,14 +22,14 @@ This guide installs the Mithril CLI and sets up a new project.
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-This runs `go install github.com/mithril-framework/mithril/cmd/mithril@latest` and prints next steps.
+This runs `go install github.com/mithril-framework/mithril/cmd/mithril@main` and prints next steps.
 
-Ensure `$(go env GOPATH)/bin` is on your `PATH`.
+Ensure `$(go env GOPATH)/bin` is on your `PATH` (before `/usr/local/bin` if an older `mithril` is installed).
 
 ### Method 2: go install
 
 ```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@latest
+go install github.com/mithril-framework/mithril/cmd/mithril@main
 mithril --version
 ```
 
@@ -46,11 +46,12 @@ mithril --version
 ## Create a Project
 
 ```bash
-mithril new my-awesome-app
-cd my-awesome-app
+mithril new hello-mithril
+cd hello-mithril
+mithril install
 ```
 
-`mithril new` clones the framework, removes dev cruft (`.git`, stray binaries), rewrites the Go module to your project name, copies `env.example` → `.env`, and runs `go mod tidy`.
+`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module to your project name, copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository** (no link to framework history).
 
 Custom module path:
 
@@ -179,7 +180,7 @@ Mithril requires Go 1.25+. Check with `go version`.
 
 **`mithril --version` shows `dev` or scaffold output**
 
-Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@latest` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
+Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@main` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
 
 ## Next Steps
 
