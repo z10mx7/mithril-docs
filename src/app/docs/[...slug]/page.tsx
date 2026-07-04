@@ -1,6 +1,7 @@
 import { allDocs } from 'contentlayer/generated';
 import { notFound } from 'next/navigation';
-import { Mdx } from '@/components/mdx-components';
+import { Suspense } from 'react';
+import { Mdx } from '@/components/mdx-server';
 import Breadcrumb from '@/components/bread-crumb';
 import Toc from '@/components/toc';
 
@@ -44,17 +45,14 @@ const DocsPage = async ({ params }: { params: tParams }) => {
       <article className="overflow-auto">
         <div className="mb-8 text-center">
           <Breadcrumb path={doc.url} />
-          {/* {doc.date && (
-            <time dateTime={doc.date} className="mb-1 text-xs text-gray-600">
-              {format(parseISO(doc.date), 'LLLL d, yyyy')}
-            </time>
-          )}
-          <h1 className="text-3xl font-bold">{doc.title}</h1> */}
         </div>
+        <h1 className="sr-only">{doc.title}</h1>
         <Mdx code={doc.body.code} />
       </article>
 
-      <Toc doc={doc} />
+      <Suspense fallback={null}>
+        <Toc doc={doc} />
+      </Suspense>
     </div>
   );
 };

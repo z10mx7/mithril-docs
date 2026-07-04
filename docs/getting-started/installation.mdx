@@ -67,8 +67,10 @@ make dc-up-postgres
 # Run migrations
 mithril migrate-up
 
-# Create admin user
-mithril createsuperuser
+# Create a login user (pick one)
+mithril seed              # user@example.com / password
+# mithril createsuperuser
+# mithril createsuperuser --email admin@example.com --password 'your-password'
 
 # Run server (port 4000)
 mithril run
@@ -174,6 +176,10 @@ Comment out `DB_HOST` in `.env` to preview `/`, `/health`, and `/docs` while deb
 **Go version mismatch**
 
 Mithril requires Go 1.25+. Check with `go version`.
+
+**`mithril --version` shows `dev` or scaffold output**
+
+Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@latest` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
 
 ## Next Steps
 
