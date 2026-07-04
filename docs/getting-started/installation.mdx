@@ -22,14 +22,21 @@ This guide installs the Mithril CLI and sets up a new project.
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-This runs `go install github.com/mithril-framework/mithril/cmd/mithril@main` and prints next steps.
+This runs `go install github.com/mithril-framework/mithril/cmd/mithril@latest` and prints next steps.
 
-Ensure `$(go env GOPATH)/bin` is on your `PATH` (before `/usr/local/bin` if an older `mithril` is installed).
+**After install**, add Go bin to your PATH (required if another `mithril` exists on the system):
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+mithril --version   # expect: mithril 1.0.0 (github.com/mithril-framework/mithril)
+```
+
+Put that `export` in `~/.zshrc` or `~/.bashrc`. If `mithril --version` prints `dev`, run `sudo $(go env GOPATH)/bin/mithril init` or fix PATH order.
 
 ### Method 2: go install
 
 ```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@main
+go install github.com/mithril-framework/mithril/cmd/mithril@latest
 mithril --version
 ```
 
@@ -51,9 +58,9 @@ cd hello-mithril
 mithril install
 ```
 
-`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module to your project name, copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository** (no link to framework history).
+`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module (defaults to `github.com/<your-github-user>/<name>` when `gh` or `git config github.user` is set), copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository**.
 
-Custom module path:
+Override the module path:
 
 ```bash
 mithril new -module github.com/acme/api my-api
@@ -180,7 +187,7 @@ Mithril requires Go 1.25+. Check with `go version`.
 
 **`mithril --version` shows `dev` or scaffold output**
 
-Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@main` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
+Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@latest` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
 
 ## Next Steps
 
