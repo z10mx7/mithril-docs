@@ -32,7 +32,7 @@ docker run --rm -p 4000:4000 \
 
 ## Dockerfile Overview
 
-1. **Builder stage**: `golang:1.24-alpine`, `go build -o app .`
+1. **Builder stage**: `golang:1.25-alpine`, `go build -o app .`
 2. **Runtime stage**: `alpine`, copies binary + `views/`, `public/`, `docs/swagger.json`
 3. **Healthcheck**: `GET /health`
 
