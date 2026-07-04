@@ -73,6 +73,7 @@ import {
 
 import { Folder, FolderTree, File } from '@/components/folder-tree';
 import { Note } from '@/components/note';
+import { PlannedFeatureBanner } from '@/components/planned-feature-banner';
 import { Checkbox } from '@/components/checkbox';
 import { Label } from '@/components/label';
 import { Input } from '@/components/input';
@@ -279,6 +280,7 @@ const components = {
   FolderTree,
   File,
   Note,
+  PlannedFeatureBanner,
   Menu,
   MenuItem,
   MenuTrigger,

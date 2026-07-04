@@ -5,421 +5,156 @@ description: 'Install Mithril framework and get started'
 
 # Installation
 
-This guide will help you install the Mithril framework and get started with your first project.
+This guide installs the Mithril CLI and sets up a new project.
 
 ## Prerequisites
 
-Before installing Mithril, make sure you have the following installed:
+- **Go 1.24+** — [Download Go](https://go.dev/dl/)
+- **Git** — [Download Git](https://git-scm.com/downloads)
+- **Make** — GNU Make (pre-installed on macOS/Linux)
+- **Docker** (optional) — for local Postgres and dev services
 
-- **Go 1.21 or later** - [Download Go](https://golang.org/dl/)
-- **Git** - [Download Git](https://git-scm.com/downloads)
-- **Make** - [GNU Make](https://www.gnu.org/software/make/)
-- **Docker** (optional) - [Download Docker](https://www.docker.com/get-started)
-- **PostgreSQL** (optional, for local development) - [Download PostgreSQL](https://www.postgresql.org/download/)
+## Install the CLI
 
-## Installation Methods
-
-### Method 1: Universal One-Line Installation (Recommended)
+### Method 1: Install script (recommended)
 
 ```bash
-# Automatic OS detection and installation
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-This single command automatically:
+This runs `go install github.com/mithril-framework/mithril/cmd/mithril@latest` and prints next steps.
 
-- Detects your operating system (Linux, macOS, Windows)
-- Downloads the appropriate installation script
-- Installs Mithril with the best method for your platform
-- Verifies the installation
+Ensure `$(go env GOPATH)/bin` is on your `PATH`.
 
-### Method 2: Manual Installation
+### Method 2: go install
 
 ```bash
-# Install the global CLI tool manually
 go install github.com/mithril-framework/mithril/cmd/mithril@latest
-
-# Verify installation
 mithril --version
 ```
 
-### Method 3: Install from Source
+### Method 3: From source
 
 ```bash
-# Clone the repository
 git clone https://github.com/mithril-framework/mithril.git
 cd mithril
-
-# Build and install
-go build -o mithril cmd/mithril/main.go
-sudo mv mithril /usr/local/bin/
-
-# Verify installation
+go build -o bin/mithril ./cmd/mithril
+sudo ln -sf "$(pwd)/bin/mithril" /usr/local/bin/mithril
 mithril --version
 ```
 
-### Method 4: Using Go Modules (For Development)
+## Create a Project
 
 ```bash
-# Create a new directory for your project
-mkdir my-mithril-project
-cd my-mithril-project
-
-# Initialize Go module
-go mod init my-mithril-project
-
-# Add Mithril as a dependency
-go get github.com/mithril-framework/mithril@latest
-
-# Create a simple main.go
-cat > main.go << 'EOF'
-package main
-
-import (
-    "log"
-    "github.com/mithril-framework/mithril/pkg/core"
-)
-
-func main() {
-    app := core.NewApplication()
-    log.Fatal(app.Listen(":3000"))
-}
-EOF
-
-# Run the application
-go run main.go
-```
-
-## Installation Script Explained
-
-The Mithril framework provides a universal installation script that automatically detects your operating system and installs the appropriate version:
-
-### Universal Installation Script (`install.sh`)
-
-- **What it does**: Automatically detects your OS and installs Mithril using the best method for your platform
-- **Platforms**: Linux, macOS, Windows (with WSL), and other Unix-like systems
-- **Requirements**:
-  - `curl` or `wget` for downloading
-  - Go 1.21+ (for fallback building from source)
-- **Features**:
-  - Automatic OS detection
-  - Downloads pre-built binaries when available
-  - Falls back to building from source if needed
-  - Verifies installation after completion
-  - Provides helpful error messages and troubleshooting tips
-
-## Quick Start
-
-### 1. Create a New Project
-
-```bash
-# Create a new Mithril project
 mithril new my-awesome-app
-
-# Navigate to the project directory
 cd my-awesome-app
-
-# Install dependencies
-mithril install
-
-# or use shorthand
-mithril i
+cp env.example .env
 ```
 
-### 2. Configure Environment
+`mithril new` clones the framework template, removes `.git`, copies `env.example` to `.env`, and runs `go mod tidy`.
+
+## Start Developing
 
 ```bash
-# Copy the example environment file
-mv env.example .env
+# Start PostgreSQL (Docker)
+make dc-up-postgres
 
-# Edit the environment file
-vi .env
-
-# make sure do all needed changes in .env file ,  including database credentials and jwt secret and apikey's
-```
-
-### 3. Set Up Database
-
-```bash
-# Run database migrations (GORM AutoMigrate)
-# Make sure your models are registered using migration.RegisterModel() in their init() functions
+# Run migrations
 mithril migrate-up
 
-# Seed the database (optional)
-mithril seed
+# Create admin user
+mithril createsuperuser
+
+# Run server (port 4000)
+mithril run
 ```
 
-### 4. Start Development Server
+Visit:
+
+- App: http://localhost:4000
+- Swagger: http://localhost:4000/docs
+- Health: http://localhost:4000/health
+
+## Clone the Framework Repo
+
+To contribute or run the framework itself:
 
 ```bash
-# Start the development server with live reload
-mithril run-dev
-
-# Or start with docker
-mithril run-docker
+git clone https://github.com/mithril-framework/mithril.git
+cd mithril
+make install
+cp env.example .env
+make dc-up-postgres
+make migrate-up
+make run
 ```
 
-### 5. Access Your Application
+Inside a project, `mithril <target>` delegates to `make` (same as `./mithril` shell script).
 
-- **Web Application**: http://localhost:4000
-- **API Documentation**: http://localhost:4000/docs
-- **Health Check**: http://localhost:4000/health
-- **Live Check**: http://localhost:4000/livez
-- **Ready Check**: http://localhost:4000/readyz
-- **Resource and Usage Monitor**: http://localhost:4000/monitor
-- **Admin Panel (need a command to run)**: http://localhost:4000/admin
-- **DBMS Panel (need a command to run)**: http://localhost:5050
+## Environment Variables
+
+Copy `env.example` to `.env`:
+
+```bash
+cp env.example .env
+```
+
+Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `PORT` | HTTP port (default `4000`) |
+| `JWT_SECRET` | **Required** when `APP_ENV=production` |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `ENABLE_REGISTER` | Set `true` to allow `POST /auth/register` |
+| `ENABLE_COMPRESSION` | Enable gzip responses |
+| `ENABLE_HELMET` | Security headers |
+| `CORS_ORIGINS` | Comma-separated allowed origins |
 
 ## Project Structure
 
-After creating a new project, you'll have the following structure:
-
 ```
-
-mithril-rev/
-├── cmd/                          # CLI entrypoints (acl, backup, seed, swagger, etc.)
-│   ├── acl/
-│   ├── backup/
-│   ├── createsuperuser/
-│   ├── crud/
-│   ├── dbms/
-│   ├── mithril/
-│   ├── seed/
-│   ├── swagger/
-│   └── util/
-├── internal/                     # Core application modules
-│   ├── acl/
-│   ├── admin/
-│   ├── auth/
-│   ├── cli/
-│   ├── createsuperuser/
-│   ├── crud/
-│   │   ├── blog/
-│   │   └── user/
-│   ├── db/
-│   │   └── backup/
-│   ├── dbms/
-│   ├── timezone/
-│   └── vendor/
-├── database/                     # DB layer
-│   ├── backups/
-│   ├── migrations/
+mithril/
+├── main.go                 # Entry point
+├── routes/                 # Route registration
+├── internal/               # Auth, ACL, admin, CRUD
+├── database/
 │   ├── models/
 │   ├── repositories/
-│   └── seeders/
-├── routes/                       # Route registration
-│   ├── admin.go
-│   ├── auth.go
-│   ├── core.go
-│   ├── crud_blog.go
-│   ├── crud_user.go
-│   ├── register.go
-│   ├── vendor.go
-│   └── web.go
-├── public/                       # Static/public assets
-│   ├── admin/
-│   ├── assets/
-│   └── static/
-├── pkg/                          # Reusable packages
-│   └── utils/
-├── infrastructure/               # Deployment/runtime infra
-│   ├── docker-compose.services.yml
-│   ├── k8s/
-│   ├── nginx.conf
-│   └── traefik.yaml
-├── docs/
-│   ├── backup-restore.md
-│   └── swagger.json
-├── views/
-│   └── demo.jet
-├── bin/
-├── main.go                       # Application entry point
+│   └── migrations/         # goose SQL
+├── cmd/                    # CLI tools
+├── pkg/utils/              # Shared utilities
+├── public/admin/           # Admin SPA
+├── infrastructure/         # Docker, K8s, compose
 ├── Makefile
-├── Dockerfile
-├── go.mod
-├── go.sum
-├── env.example
-├── .env
-├── install.sh
-├── locustfile.py
-└── README.md
-```
-
-## Configuration
-
-### Environment Variables
-
-Mithril uses environment variables for configuration. Copy `env.example` to `.env` and customize:
-
-```bash
-PORT=4000
-APP_NAME=mithril
-# Process timezone (IANA, e.g. America/New_York). APP_TIMEZONE overrides TZ when both are set.
-TZ=UTC
-JWT_SECRET=generate-a-secret-key-for-your-application
-
-# PostgreSQL (optional; if unset, app runs without DB)
-DATABASE_URL=postgres://user:password@localhost:5432/mithril?sslmode=disable
-
-# Or use separate vars (app and make migrate-* use DATABASE_URL when set):
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=""
-DB_NAME=mithril
-DB_SSLMODE=disable
-
-# Set to 1 to allow POST /auth/register; when unset, registration is disabled (app cannot create users via API).
-ENABLE_REGISTER=true
-
-# Set to true to enable gzip response compression.
-ENABLE_COMPRESSION=true
-
-# Set to true to enable Helmet security headers (XSS, nosniff, X-Frame-Options, etc.).
-ENABLE_HELMET=true
-
-OPENAI_API_KEY=
-
-# Embedded PostgreSQL web UI (Adminer-style): ENABLE_DBMS=true or touch .dbms-enabled; then `make dbms`.
-# Default listen address :5050; override with DBMS_ADDR=:9090 (legacy: ADDR is also read if DBMS_ADDR is empty).
-ENABLE_DBMS=true
-DBMS_ADDR=:5050
-```
-
-## Database Setup
-
-### PostgreSQL (Recommended)
-
-you can easily [Download PostgreSQL](https://www.postgresql.org/download/)
-OR Install PostgreSQL using one of this :
-
-```bash
-# Ubuntu/Debian
-sudo apt-get install postgresql postgresql-contrib
-
-# macOS
-brew install postgresql
-
-# Start PostgreSQL
-sudo service postgresql start
-
-# Create database
-sudo -u postgres createdb my_awesome_app
-```
-
-### Using Docker
-
-```bash
-# Build the Docker image
-mithril dc-up-postgres
-mithril dc-start-postgres
-
+└── mithril                 # make wrapper script
 ```
 
 ## Troubleshooting
 
-### Common Issues
+**`mithril: command not found`**
 
-#### 1. Installation Script Fails
+Add Go bin to PATH:
 
-```
-curl: command not found
-```
-
-**Solution**:
-
-- Install curl: `sudo apt-get install curl` (Ubuntu/Debian) or `brew install curl` (macOS)
-- Use manual installation method: `go install github.com/mithril-framework/mithril/cmd/mithril@latest`
-- Check your internet connection
-
-#### 2. Go Version Error
-
-```
-go: requires go >= 1.21
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
-**Solution**: Update Go to version 1.21 or later.
+**Database connection failed**
 
-#### 3. Binary Not Found After Installation
+Ensure Postgres is running and `DATABASE_URL` in `.env` matches your setup. With Docker:
 
-```
-mithril: command not found
-```
-
-**Solution**:
-
-- Restart your terminal
-- Check if `/usr/local/bin` is in your PATH
-- Try manual installation: `go install github.com/mithril-framework/mithril/cmd/mithril@latest`
-
-#### 4. Database Connection Error
-
-```
-failed to connect to database
+```bash
+make dc-up-postgres
+# Default DB: mithril_rev on localhost:5432
 ```
 
-**Solution**:
+**Go version mismatch**
 
-- Check if the database server is running
-- Verify connection details in `.env`
-- Ensure the database exists
-
-#### 5. Port Already in Use
-
-```
-bind: address already in use
-```
-
-**Solution**:
-
-- Kill the process using the port: `mithril kill` and start mithril again using `mithril run-dev`
-- Use a different port in `.env` file and start mithril again using `mithril run-dev`
-- Kill the process using the port: `lsof -ti:3000 | xargs kill -9`
-
-#### 6. Permission Denied
-
-```
-permission denied
-```
-
-**Solution**:
-
-- Use `sudo` for global installation
-- Check file permissions
-- Ensure you have write access to the directory
-
-### Getting Help
-
-- **Documentation**: https://mithril-framework.dev/docs
-- **GitHub Issues**: https://github.com/mithril-framework/mithril/issues
-- **Discord Community**: https://discord.gg/mithril
-- **Stack Overflow**: Tag your questions with `mithril-framework`
+Mithril requires Go 1.24+. Check with `go version`.
 
 ## Next Steps
 
-1. **Read the Documentation**: https://mithril-framework.dev/docs
-2. **Try the Tutorial**: https://mithril-framework.dev/tutorial
-3. **Explore Examples**: https://github.com/mithril-framework/examples
-4. **Join the Community**: https://discord.gg/mithril
-
-## Uninstallation
-
-### Remove Global CLI
-
-```bash
-# If installed via go install
-go clean -i github.com/mithril-framework/mithril/cmd/mithril
-
-# If installed manually
-sudo rm /usr/local/bin/mithril
-```
-
-### Remove from Go Module
-
-```bash
-# Remove from go.mod
-go mod edit -droprequire github.com/mithril-framework/mithril
-
-# Clean module cache
-go clean -modcache
-```
+- [Quick Start](/docs/getting-started/quick-start)
+- [Migrations](/docs/database/migrations)
+- [Docker deployment](/docs/deployment/docker)

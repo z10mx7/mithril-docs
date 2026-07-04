@@ -1,0 +1,83 @@
+---
+title: 'Models & Relationships'
+description: 'Database models and the repository pattern in Mithril'
+---
+
+# Models & Relationships
+
+Mithril uses plain Go structs in `database/models/` with [pgx](https://github.com/jackc/pgx) for PostgreSQL access and a repository layer in `database/repositories/`.
+
+## Model Conventions
+
+- One file per model, **lowercase filename**: `user.go`, `blog.go`
+- Struct names are PascalCase: `User`, `Blog`
+- UUID primary keys via `github.com/google/uuid`
+- Timestamps: `CreatedAt`, `UpdatedAt` as `time.Time`
+
+### User model
+
+```go
+type User struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`
+	FirstName    string    `json:"first_name"`
+	LastName     string    `json:"last_name"`
+	IsActive     bool      `json:"is_active"`
+	IsSuperuser  bool      `json:"is_superuser"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+```
+
+### Blog model (with foreign key)
+
+```go
+type Blog struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	AuthorID  uuid.UUID `json:"author_id"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+```
+
+`author_id` references `users(id)` — defined in goose migrations.
+
+## Repositories
+
+Repositories encapsulate SQL and live in `database/repositories/`:
+
+```go
+type BlogRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewBlogRepository(db *pgxpool.Pool) *BlogRepository {
+	return &BlogRepository{db: db}
+}
+
+func (r *BlogRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Blog, error) {
+	// ...
+}
+```
+
+Standard methods: `Create`, `GetByID`, `Update`, `Delete`, `List`.
+
+## ACL models
+
+Role/permission tables are defined in `database/models/acl.go` and managed via the [RBAC](/docs/authentication/rbac) system.
+
+## Adding a New Model
+
+1. Create `database/models/yourmodel.go`
+2. Add a goose migration in `database/migrations/`
+3. Run `mithril migrate-up`
+4. Optionally generate CRUD: `mithril crud MODEL=Yourmodel`
+
+## Next Steps
+
+- [Migrations](/docs/database/migrations)
+- [Seeders](/docs/database/seeders)

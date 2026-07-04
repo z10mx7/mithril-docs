@@ -1,0 +1,70 @@
+---
+title: 'Docker'
+description: 'Deploy Mithril with Docker'
+---
+
+# Docker Deployment
+
+Mithril ships a multi-stage Alpine Dockerfile and docker-compose services for development.
+
+## Build Image
+
+```bash
+make docker-build
+# or: docker build -t mithril:latest .
+```
+
+## Run Container
+
+```bash
+make run-docker
+# Maps host :4000 -> container :4000
+```
+
+Pass environment at runtime:
+
+```bash
+docker run --rm -p 4000:4000 \
+  -e JWT_SECRET=change-me \
+  -e DATABASE_URL=postgres://user:pass@host.docker.internal:5432/mithril_rev?sslmode=disable \
+  mithril:latest
+```
+
+## Dockerfile Overview
+
+1. **Builder stage**: `golang:1.24-alpine`, `go build -o app .`
+2. **Runtime stage**: `alpine`, copies binary + `views/`, `public/`, `docs/swagger.json`
+3. **Healthcheck**: `GET /health`
+
+## Dev Services (Compose)
+
+`infrastructure/docker-compose.services.yml` provides:
+
+| Service | Port | Command |
+|---------|------|---------|
+| postgres | 5432 | `make dc-up-postgres` |
+| pgadmin | 5050 | `make dc-up-pgadmin` |
+| adminer | 8080 | `make dc-up-adminer` |
+| redis | 6379 | `make dc-up-redis` |
+| rabbitmq | 5672 | `make dc-up-rabbitmq` |
+| kafka | 9092 | `make dc-up-kafka` |
+
+```bash
+make dc-up-postgres
+make dc-logs-postgres
+make dc-stop-postgres
+```
+
+Postgres default database: `mithril_rev`.
+
+## Production Notes
+
+- Set `APP_ENV=production` and a strong `JWT_SECRET`
+- Use external managed PostgreSQL
+- Mount secrets via orchestrator (K8s secrets, not `.env` in image)
+- Enable `ENABLE_HELMET=true` and `ENABLE_COMPRESSION=true` as needed
+
+## Next Steps
+
+- [Kubernetes](/docs/deployment/kubernetes)
+- [Installation](/docs/getting-started/installation)

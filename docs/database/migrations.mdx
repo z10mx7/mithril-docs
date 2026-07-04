@@ -1,0 +1,79 @@
+---
+title: 'Migrations'
+description: 'Database migrations with goose in Mithril'
+---
+
+# Migrations
+
+Mithril uses [goose](https://github.com/pressly/goose) for versioned SQL migrations in `database/migrations/`.
+
+## File Naming
+
+```
+database/migrations/
+├── 0001_create_users.sql
+├── 0004_acl.sql
+├── 0005_blogs.sql
+└── ...
+```
+
+Use sequential prefixes and descriptive names.
+
+## Migration Format
+
+```sql
+-- +goose Up
+CREATE TABLE blogs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- +goose Down
+DROP TABLE IF EXISTS blogs;
+```
+
+## CLI Commands
+
+```bash
+mithril migrate-up       # Apply pending migrations
+mithril migrate-down     # Roll back one migration
+mithril migrate-status   # Show migration state
+mithril migrate-reset    # Reset database (destructive)
+```
+
+These map to `make migrate-*` targets and use `DATABASE_URL` from `.env`.
+
+## Connection
+
+Set in `.env`:
+
+```bash
+DATABASE_URL=postgres://postgres@localhost:5432/mithril_rev?sslmode=disable
+```
+
+Or individual vars: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
+
+## Local Postgres
+
+```bash
+make dc-up-postgres   # Docker compose service
+mithril migrate-up
+```
+
+Default database name: `mithril_rev`.
+
+## Best Practices
+
+- Never edit applied migrations in production — add a new file instead
+- Always include `-- +goose Down` for rollback
+- Test migrations with `migrate-down` before deploying
+
+## Next Steps
+
+- [Models](/docs/database/models)
+- [Seeders](/docs/database/seeders)

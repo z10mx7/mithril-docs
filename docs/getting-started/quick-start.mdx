@@ -5,227 +5,123 @@ description: 'Create your first Mithril application in minutes'
 
 # Quick Start
 
-Get up and running with Mithril in just a few minutes! This guide will walk you through creating your first Mithril application.
+Get a Mithril app running in a few minutes.
 
-## Create Your First Project
-
-### 1. Install Mithril
+## 1. Install the CLI
 
 ```bash
-# Install the global CLI tool
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-### 2. Create a New Project
+## 2. Create a Project
 
 ```bash
-# Create a new Mithril project
 mithril new hello-mithril
-
-# Navigate to the project directory
 cd hello-mithril
-```
-
-### 3. Install Dependencies
-
-```bash
-# Install Go dependencies
 mithril install
-```
-
-### 4. Configure Environment
-
-```bash
-# Copy the example environment file
 cp env.example .env
-
-# put your db credentials and apikeys and secrets in .env file
 ```
 
-### 5. Start the Development Server
+## 3. Start PostgreSQL
 
 ```bash
-# Start the development server
-mithril run-dev
+make dc-up-postgres
+mithril migrate-up
+mithril createsuperuser
 ```
 
-### 6. Visit Your Application
+## 4. Run the Server
 
-Open your browser and visit:
-
-- **Web Application**: http://localhost:4000
-- **API Documentation**: http://localhost:4000/docs
-- **Health Check**: http://localhost:4000/health
-- **Live Check**: http://localhost:4000/livez
-- **Ready Check**: http://localhost:4000/readyz
-- **Resource and Usage Monitor**: http://localhost:4000/monitor
-- **Admin Panel (need a command to run `mithril admin-enable`)**: http://localhost:4000/admin
-- **DBMS Panel (need a command to run `mithril dbms-enable && mithril dbms`)**: http://localhost:5050
-
-🎉 **Congratulations!** You've created your first Mithril application!
-
-## Understanding the Project Structure
-
-Let's explore what Mithril created for you:
-
+```bash
+mithril run-dev   # live reload with Air
+# or: mithril run
 ```
 
-mithril-rev/
-├── cmd/                          # CLI entrypoints (acl, backup, seed, swagger, etc.)
-│   ├── acl/
-│   ├── backup/
-│   ├── createsuperuser/
-│   ├── crud/
-│   ├── dbms/
-│   ├── mithril/
-│   ├── seed/
-│   ├── swagger/
-│   └── util/
-├── internal/                     # Core application modules
-│   ├── acl/
-│   ├── admin/
-│   ├── auth/
-│   ├── cli/
-│   ├── createsuperuser/
-│   ├── crud/
-│   │   ├── blog/
-│   │   └── user/
-│   ├── db/
-│   │   └── backup/
-│   ├── dbms/
-│   ├── timezone/
-│   └── vendor/
-├── database/                     # DB layer
-│   ├── backups/
-│   ├── migrations/
-│   ├── models/
-│   ├── repositories/
-│   └── seeders/
-├── routes/                       # Route registration
-│   ├── admin.go
-│   ├── auth.go
-│   ├── core.go
-│   ├── crud_blog.go
-│   ├── crud_user.go
-│   ├── register.go
-│   ├── vendor.go
-│   └── web.go
-├── public/                       # Static/public assets
-│   ├── admin/
-│   ├── assets/
-│   └── static/
-├── pkg/                          # Reusable packages
-│   └── utils/
-├── infrastructure/               # Deployment/runtime infra
-│   ├── docker-compose.services.yml
-│   ├── k8s/
-│   ├── nginx.conf
-│   └── traefik.yaml
-├── docs/
-│   ├── backup-restore.md
-│   └── swagger.json
-├── views/
-│   └── demo.jet
-├── bin/
-├── main.go                       # Application entry point
+## 5. Visit Your App
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:4000 | API root |
+| http://localhost:4000/docs | Swagger UI |
+| http://localhost:4000/health | Health check |
+| http://localhost:4000/monitor | System monitor |
+| http://localhost:4000/admin | Admin panel (after `mithril admin-enable`) |
+| http://localhost:5050 | DBMS (after `mithril dbms-enable && mithril dbms`) |
+
+## Project Structure
+
+```
+hello-mithril/
+├── main.go                 # Fiber app bootstrap
+├── routes/                 # register.go, auth, CRUD, admin
+├── internal/               # auth, acl, admin, crud handlers
+├── database/
+│   ├── models/             # User, Blog, ACL structs
+│   ├── repositories/       # pgx data access
+│   └── migrations/         # goose SQL files
+├── cmd/                    # mithril, crud, acl, seed, backup, …
+├── pkg/utils/              # hash, encrypt, validation helpers
+├── public/admin/           # Admin SPA
+├── infrastructure/         # Docker compose, K8s
 ├── Makefile
-├── Dockerfile
-├── go.mod
-├── go.sum
-├── env.example
-├── .env
-├── install.sh
-├── locustfile.py
-└── README.md
+└── mithril                 # delegates to make
 ```
 
 ## Your First API Endpoint
 
-Let's create a simple API endpoint to get familiar with Mithril:
-
-### 1. Create a Route
-
-Edit `routes/new.go`:
+Add a route in `routes/web.go` or create `routes/hello.go`:
 
 ```go
 package routes
 
 import "github.com/gofiber/fiber/v2"
 
-// SetupNewRoutes registers new public API routes.
-func SetupNewRoutes(app *fiber.App) {
+func SetupHelloRoutes(app *fiber.App) {
 	app.Get("/api/hello", func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"message": "Hello from Mithril!",
-		})
+		return c.JSON(fiber.Map{"message": "Hello from Mithril!"})
 	})
 }
-
 ```
 
-Add it to `routes/register.go`, right after `SetupCoreRoutes(app, pool)`:
+Register it in `routes/register.go` inside `RegisterAll`:
 
 ```go
-SetupNewRoutes(app)
+SetupHelloRoutes(app)
 ```
 
-### 3. Test Your Endpoint
-
-in your browser go to http://localhost:3000/api/hello
+Test:
 
 ```bash
-# OR
-curl http://localhost:3000/api/hello
+curl http://localhost:4000/api/hello
 ```
 
-You should see:
+## Database Model & Migration
 
-```json
-{
-  "message": "Hello from Mithril!"
-}
-```
+### 1. Create a model
 
-## Your First Database Model
+Add `database/models/article.go`:
 
-Let's create a simple User model and see Mithril's database features:
-
-### 1. Create a Model
-
-create a new model in database/models/Article.go
-
-```bash
+```go
 package models
 
 import (
 	"time"
-
 	"github.com/google/uuid"
 )
 
-// Article represents a Article row (pgx scanning).
 type Article struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
 	AuthorID  uuid.UUID `json:"author_id"`
-	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-
-
 ```
 
-### 2. Generate Migration
+### 2. Write a goose migration
 
-Mithril uses goose to turn your models in sql file:
-
-```bash
-mithril migrate-gen MODEL=Article
-```
-
-it will create sql file for goose at database/migrations/0008_articles.sql
+Create `database/migrations/0008_articles.sql`:
 
 ```sql
 -- +goose Up
@@ -234,259 +130,82 @@ CREATE TABLE articles (
     title TEXT NOT NULL DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
     author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_articles_author_id ON articles(author_id);
-CREATE INDEX idx_articles_created_at ON articles(created_at DESC);
 
 -- +goose Down
 DROP TABLE IF EXISTS articles;
 ```
 
-### 3. Run the Migration
+<Note>
+`migrate-gen` (auto-generate SQL from models) is planned — write migrations manually with goose for now.
+</Note>
+
+### 3. Run migrations
 
 ```bash
-# Run migrations
 mithril migrate-up
 ```
 
-## First Crud
+## Generate CRUD
 
 ```bash
-mithril crud MODEL=User
+mithril crud MODEL=Blog
 ```
 
-This creates:
+This generates:
 
-- database/repositories/blog_repositoryd.go
-- routes/crud_blog.go
+- `database/repositories/blog_repository.go` (skipped if exists)
+- `internal/crud/blog/handlers.go`
+- `routes/crud_blog.go`
+- Updates `routes/register.go` with `MountCrudBlogRoutes`
 
-blog_repositoryd.go :
-
-```go
-package repositories
-
-import (
-	"context"
-
-	"github.com/mithril-framework/mithril/database/models"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
-)
-
-// BlogRepository provides blog persistence.
-type BlogRepository struct {
-	db *pgxpool.Pool
-}
-
-// NewBlogRepository returns a new BlogRepository.
-func NewBlogRepository(db *pgxpool.Pool) *BlogRepository {
-	return &BlogRepository{db: db}
-}
-
-// Create inserts a blog.
-func (r *BlogRepository) Create(ctx context.Context, m *models.Blog) error {
-	if m.ID == uuid.Nil {
-		m.ID = uuid.New()
-	}
-	query := `
-		INSERT INTO blogs (id, title, content, author_id, is_active)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING created_at, updated_at
-	`
-	return r.db.QueryRow(ctx, query, m.ID, m.Title, m.Content, m.AuthorID, m.IsActive).Scan(&m.CreatedAt, &m.UpdatedAt)
-}
-
-// GetByID returns a blog by id.
-func (r *BlogRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Blog, error) {
-	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs WHERE id = $1`
-	var m models.Blog
-	err := r.db.QueryRow(ctx, query, id).Scan(&m.ID, &m.Title, &m.Content, &m.AuthorID, &m.IsActive, &m.CreatedAt, &m.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
-
-// Update updates a blog by id.
-func (r *BlogRepository) Update(ctx context.Context, m *models.Blog) error {
-	query := `UPDATE blogs SET title = $1, content = $2, author_id = $3, is_active = $4, updated_at = NOW() WHERE id = $5`
-	_, err := r.db.Exec(ctx, query, m.Title, m.Content, m.AuthorID, m.IsActive, m.ID)
-	return err
-}
-
-// Delete deletes a blog by id.
-func (r *BlogRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM blogs WHERE id = $1`, id)
-	return err
-}
-
-// List returns blogs with limit and offset.
-func (r *BlogRepository) List(ctx context.Context, limit, offset int) ([]*models.Blog, error) {
-	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs ORDER BY created_at DESC LIMIT $1 OFFSET $2`
-	rows, err := r.db.Query(ctx, query, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanBlogRows(rows)
-}
-
-// ListByAuthor returns blogs for one author.
-func (r *BlogRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID, limit, offset int) ([]*models.Blog, error) {
-	query := `SELECT id, title, content, author_id, is_active, created_at, updated_at FROM blogs WHERE author_id = $3 ORDER BY created_at DESC LIMIT $1 OFFSET $2`
-	rows, err := r.db.Query(ctx, query, limit, offset, authorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanBlogRows(rows)
-}
-
-func scanBlogRows(rows interface {
-	Next() bool
-	Scan(dest ...any) error
-	Err() error
-	Close()
-}) ([]*models.Blog, error) {
-	var list []*models.Blog
-	for rows.Next() {
-		var m models.Blog
-		if err := rows.Scan(&m.ID, &m.Title, &m.Content, &m.AuthorID, &m.IsActive, &m.CreatedAt, &m.UpdatedAt); err != nil {
-			return nil, err
-		}
-		list = append(list, &m)
-	}
-	return list, rows.Err()
-}
-
-```
-
-crud_blog.go:
-
-```go
-package routes
-
-import (
-	"github.com/mithril-framework/mithril/database/repositories"
-	"github.com/mithril-framework/mithril/internal/acl"
-	crudhandlers "github.com/mithril-framework/mithril/internal/crud/blog"
-
-	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
-)
-
-// MountCrudBlogRoutes registers blog CRUD on an existing /api group (middleware already applied).
-func MountCrudBlogRoutes(api fiber.Router, pool *pgxpool.Pool, aclSvc *acl.Service) {
-	if pool == nil {
-		return
-	}
-	repo := repositories.NewBlogRepository(pool)
-	h := crudhandlers.NewHandlers(repo, aclSvc)
-	api.Get("/blogs", h.List)
-	api.Get("/blogs/:id", h.Get)
-	api.Post("/blogs", h.Create)
-	api.Put("/blogs/:id", h.Update)
-	api.Delete("/blogs/:id", h.Delete)
-}
-
-```
-
-### 2. Create a Superuser
+Dry run:
 
 ```bash
-# Create an admin user
-mithril createsuperuser
+go run ./cmd/crud --dry-run Blog
 ```
 
-you can sign in into admin from http://localhost:4000/admin
+API routes (JWT + ACL required):
 
-## Update Swagger Documentation
+- `GET /api/blogs`
+- `POST /api/blogs`
+- `GET /api/blogs/:id`
+- `PUT /api/blogs/:id`
+- `DELETE /api/blogs/:id`
 
-make sure put your openai api key inside .env, then :
+## Authentication Quick Test
 
 ```bash
-mithril swagger
+# Login (after createsuperuser or seed)
+curl -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"your-password"}'
+
+# Use access_token from response
+curl http://localhost:4000/auth/me \
+  -H "Authorization: Bearer <access_token>"
 ```
 
-will Regenerate OpenAPI schema from route files
-
-## Explore the CLI
-
-Mithril comes with a powerful CLI. Let's explore some commands:
+## Common CLI Commands
 
 ```bash
-mithril new PROJECT_NAME # create new project
-mithril ping # show latest ping message, some sort of version
-
-Available commands:
-mithril acl-assign-permission-role make acl-assign-permission-role ROLE_NAME=... CODENAME=...
-mithril acl-assign-permission-user make acl-assign-permission-user USER_EMAIL=... CODENAME=...
-mithril acl-assign-role make acl-assign-role USER_EMAIL=... ROLE_NAME=...
-mithril acl-permission-create make acl-permission-create CODENAME=app.perm DESC='optional'
-mithril acl-permission-delete make acl-permission-delete CODENAME=foo.bar
-mithril acl-revoke-permission-role make acl-revoke-permission-role ROLE_NAME=... CODENAME=...
-mithril acl-revoke-permission-user make acl-revoke-permission-user USER_EMAIL=... CODENAME=...
-mithril acl-revoke-role make acl-revoke-role USER_EMAIL=... ROLE_NAME=...
-mithril acl-role-create make acl-role-create NAME=editor DESC='optional description'
-mithril acl-role-delete make acl-role-delete NAME=editor
-mithril acl-superuser-set make acl-superuser-set EMAIL=user@example.com
-mithril acl-superuser-unset make acl-superuser-unset EMAIL=user@example.com
-mithril acl             Run ACL CLI: make acl ARGS='superuser set EMAIL' | ARGS='role create NAME' | ARGS='list permissions'
-mithril admin-disable   Disable admin panel (removes sentinel file; env ENABLE_ADMIN_PANEL still respected if set)
-mithril admin-enable    Enable admin panel (creates .admin-panel-enabled; or set ENABLE_ADMIN_PANEL=true)
-mithril backup-list     List backups in database/backups
-mithril backup          Create database backup (compressed SQL in database/backups). Uses pg_dump, Docker, or Go.
-mithril build-linux     Build the application for Linux
-mithril build           Build the application
-mithril clean           Clean build artifacts
-mithril createsuperuser Interactive Django-style superuser (email, password x2, names; weak-pw confirm)
-mithril crud            Generate CRUD (repository, handlers, routes) from model. Usage: make crud MODEL=User
-mithril dbms-disable    Disable DBMS (removes sentinel; unset ENABLE_DBMS in .env if set)
-mithril dbms-enable     Enable DBMS (creates .dbms-enabled; or set ENABLE_DBMS=true)
-mithril dbms            Run PostgreSQL web UI (make dbms-enable or ENABLE_DBMS=true; optional DBMS_ADDR=:5050)
-mithril dc-down         Stop and remove dev containers (keeps volumes)
-mithril dc-logs         Follow all dev containers logs
-mithril dc-run          Start all dev containers in background
-mithril dc-start        Start all stopped dev containers
-mithril dc-stop         Stop all dev containers
-mithril dc              Per-service: make dc CMD=install SVC=postgres  (CMD: install|up|start|stop|restart|logs|shell)
-mithril decode          Base64-decode (e.g. make decode hello  or  make decode S='aGVsbG8=')
-mithril docker-build    Build Docker image (tag: $(APP_NAME):latest)
-mithril encode          Base64-encode (e.g. make encode hello)
-mithril hash            Hash password with bcrypt (e.g. make hash 123)
-mithril help            Show this help message
-mithril i               Install dependencies
-mithril init-make       Symlink mithril-make to /usr/local/bin (Make wrapper: mithril-make run, …)
-mithril init            Install mithril scaffold CLI to /usr/local/bin
-mithril install-tools   Install goose CLI for migrations
-mithril install         Install dependencies
-mithril kill            Kill app on port 4000 and Air (parent of that process)
-mithril migrate-down    Run database migrations down
-mithril migrate-gen     Generate SQL migration from model. Usage: make migrate-gen MODEL=Article [NAME=custom_slug]
-mithril migrate-reset   Clear migration history and re-run all migrations (requires psql)
-mithril migrate-status  Show migration status
-mithril migrate-up      Run database migrations up (set DATABASE_URL or DB_* in .env)
-mithril new             Dogfood: scaffold from this tree. Usage: make new DEST=../myapp [ARGS='-module github.com/x/y']
-mithril restore         Restore from backup. make restore (latest) or make restore f=path/to/backup.sql.gz
-mithril routes          List all registered routes (no server start)
-mithril run-air         Alias for run-dev
-mithril run-dev         Run with live reload (Air). Use this instead of `make run dev` (that form overrode the `run` target).
-mithril run-docker      Build Docker image and run container (port 4000)
-mithril run             Run the application
-mithril secret          Generate a new JWT_SECRET and update .env
-mithril seed            Seed database (demo user). Run migrate-up first. Loads .env like migrate-*.
-mithril sha256          SHA-256 checksum (e.g. make sha256 hello)
-mithril sha512          SHA-512 checksum (e.g. make sha512 hello)
-mithril swagger         Regenerate OpenAPI schema from route files via OpenAI (OPENAI_API_KEY in .env)
-mithril test            Run tests
-
+mithril --help
+mithril migrate-up
+mithril migrate-down
+mithril migrate-status
+mithril seed
+mithril backup
+mithril swagger          # requires OPENAI_API_KEY
+mithril acl-role-create NAME=editor
+mithril admin-enable
+mithril routes           # LIST_ROUTES=1 go run .
 ```
 
----
+## Next Steps
 
-**Congratulations!** You've successfully created your first Mithril application. The framework is designed to grow with your needs, from simple APIs to complex web applications. Happy coding! 🚀
+- [Models & repositories](/docs/database/models)
+- [JWT authentication](/docs/authentication/jwt)
+- [RBAC](/docs/authentication/rbac)
+- [Docker deployment](/docs/deployment/docker)

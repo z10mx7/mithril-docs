@@ -1,0 +1,73 @@
+---
+title: 'Kubernetes'
+description: 'Deploy Mithril on Kubernetes'
+---
+
+# Kubernetes Deployment
+
+Manifests live in `infrastructure/k8s/` and are applied by the GitHub Actions workflow on push to `main`.
+
+## Resources
+
+| File | Purpose |
+|------|---------|
+| `namespace.yaml` | `mithril` namespace |
+| `configmap.yaml` | `APP_NAME`, `PORT`, non-secret config |
+| `secret.yaml` | Template for `JWT_SECRET`, `DATABASE_URL` |
+| `deployment.yaml` | App deployment (port 4000) |
+| `service.yaml` | ClusterIP service |
+
+## Manual Deploy
+
+```bash
+# Create secrets (example)
+kubectl create namespace mithril
+kubectl create secret generic mithril-secret -n mithril \
+  --from-literal=JWT_SECRET=your-secret \
+  --from-literal=DATABASE_URL=postgres://...
+
+kubectl apply -f infrastructure/k8s/
+kubectl rollout status deployment/mithril -n mithril
+```
+
+## Image
+
+CI builds and pushes to GHCR:
+
+```
+ghcr.io/<owner>/mithril:latest
+```
+
+The workflow substitutes `REPO_OWNER` in `deployment.yaml` before apply.
+
+## Health Probes
+
+The app exposes:
+
+- `/health` — custom handler (checks DB when configured)
+- `/livez`, `/readyz` — Fiber healthcheck middleware
+
+Example probe:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 4000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+```
+
+## CI/CD
+
+`.github/workflows/build-deploy.yml`:
+
+1. `go test ./...`
+2. Build & push Docker image
+3. `kubectl apply` manifests
+4. Telegram notification (optional secrets)
+
+## Next Steps
+
+- [Docker](/docs/deployment/docker)
+- [Health Checks](/docs/monitoring/health)

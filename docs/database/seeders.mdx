@@ -1,0 +1,45 @@
+---
+title: 'Seeders'
+description: 'Populate your database with seed data'
+---
+
+# Seeders
+
+Mithril provides a seed command to insert demo data for development.
+
+## Run the Seeder
+
+```bash
+mithril seed
+# or: make seed
+```
+
+This runs `cmd/seed/` which creates a demo user (when configured). Seeds are **manual only** — they do not run on app startup or Air reload.
+
+## Implementation
+
+Seed logic lives in `cmd/seed/main.go`. It connects via `DATABASE_URL`, hashes passwords with bcrypt, and inserts into the `users` table.
+
+To customize:
+
+1. Edit `cmd/seed/main.go`
+2. Add additional repositories/models as needed
+3. Run `mithril seed`
+
+## Safety
+
+- Do not run seed in production without reviewing inserted data
+- Registration via API is disabled by default (`ENABLE_REGISTER` unset)
+- Use `mithril createsuperuser` for production admin accounts
+
+## Related Commands
+
+```bash
+mithril createsuperuser   # Interactive superuser creation
+mithril migrate-up          # Ensure schema exists first
+```
+
+## Next Steps
+
+- [Models](/docs/database/models)
+- [JWT Authentication](/docs/authentication/jwt)

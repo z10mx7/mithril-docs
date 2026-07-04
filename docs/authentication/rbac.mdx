@@ -1,0 +1,71 @@
+---
+title: 'RBAC'
+description: 'Role-based access control in Mithril'
+---
+
+# RBAC
+
+Mithril provides Django-inspired role-based access control (RBAC) in `internal/acl/`.
+
+## Concepts
+
+- **Permissions** — codenames like `users.view`, `blogs.add`
+- **Roles** — named groups of permissions (e.g. `editor`)
+- **User assignments** — users get roles and/or direct permissions
+- **Superuser** — bypasses all permission checks
+
+## Middleware
+
+```go
+api.Use(jwtware.New(jwtConfig))
+api.Use(acl.JWTClaimsMiddleware())
+api.Get("/users", acl.RequirePermission(aclSvc, "users.view"), h.List)
+```
+
+Other helpers: `RequireRole`, `RequireSuperuser`, `RequireAdminAccess`, `RequireAnyPermission`.
+
+## Ownership
+
+Blog handlers use `acl.Service.CanAccessOwnedResource` so authors can edit their own posts without global `blogs.change` permission.
+
+## ACL CLI
+
+```bash
+# Roles
+mithril acl-role-create NAME=editor
+mithril acl-role-delete NAME=editor
+
+# Permissions
+mithril acl-permission-create NAME=blogs.view
+mithril acl-permission-delete NAME=blogs.view
+
+# Assign role to user (by email)
+mithril acl-assign-role EMAIL=user@example.com ROLE=editor
+mithril acl-revoke-role EMAIL=user@example.com ROLE=editor
+
+# Assign permission to role
+mithril acl-assign-permission-role ROLE=editor PERMISSION=blogs.view
+
+# Superuser
+mithril acl-superuser-set EMAIL=admin@example.com
+mithril acl-superuser-unset EMAIL=admin@example.com
+```
+
+Run `make acl` or `mithril acl` for the full command list.
+
+## Admin Panel Access
+
+`/admin` requires `admin.access` permission or superuser status. Enable the panel:
+
+```bash
+mithril admin-enable
+```
+
+## Database Tables
+
+ACL schema is created by goose migrations (`0004_acl.sql`, repairs in later files). Models in `database/models/acl.go`.
+
+## Next Steps
+
+- [JWT Authentication](/docs/authentication/jwt)
+- [Models](/docs/database/models)
