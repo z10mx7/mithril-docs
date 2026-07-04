@@ -19,7 +19,12 @@ curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/inst
 mithril new hello-mithril
 cd hello-mithril
 mithril install
-cp env.example .env
+```
+
+`mithril new` copies `env.example` to `.env` and sets `APP_NAME` to your project name. Use `-module` for a custom Go module path:
+
+```bash
+mithril new -module github.com/acme/api my-api
 ```
 
 ## 3. Start PostgreSQL
@@ -30,12 +35,16 @@ mithril migrate-up
 mithril createsuperuser
 ```
 
+The Docker Postgres service uses **trust auth** and database **`mithril_rev`** — matching the defaults in `.env`.
+
 ## 4. Run the Server
 
 ```bash
 mithril run-dev   # live reload with Air
 # or: mithril run
 ```
+
+If Postgres is not running, the app still starts in development with a warning (/, `/health`, `/docs` work). Set `APP_ENV=production` to require a working database.
 
 ## 5. Visit Your App
 
@@ -45,8 +54,9 @@ mithril run-dev   # live reload with Air
 | http://localhost:4000/docs | Swagger UI |
 | http://localhost:4000/health | Health check |
 | http://localhost:4000/monitor | System monitor |
-| http://localhost:4000/admin | Admin panel (after `mithril admin-enable`) |
-| http://localhost:5050 | DBMS (after `mithril dbms-enable && mithril dbms`) |
+| http://localhost:4000/admin | Admin panel (after `mithril admin-enable` + restart) |
+| http://localhost:5050 | Embedded DBMS (after `mithril dbms-enable && mithril dbms`) |
+| http://localhost:5051 | pgAdmin (when `make dc-up-pgadmin`) |
 
 ## Project Structure
 
@@ -191,7 +201,7 @@ curl http://localhost:4000/auth/me \
 ## Common CLI Commands
 
 ```bash
-mithril --help
+mithril --version        # alias: mithril version, mithril ping
 mithril migrate-up
 mithril migrate-down
 mithril migrate-status
@@ -199,9 +209,37 @@ mithril seed
 mithril backup
 mithril swagger          # requires OPENAI_API_KEY
 mithril acl-role-create NAME=editor
-mithril admin-enable
+mithril admin-enable     # restart server after enabling
 mithril routes           # LIST_ROUTES=1 go run .
 ```
+
+## Troubleshooting
+
+**Postgres container exits immediately**
+
+Older compose files used `POSTGRES_PASSWORD=""`, which Postgres 16 rejects on a fresh volume. Current compose uses `POSTGRES_HOST_AUTH_METHOD=trust`. Reset the volume if needed:
+
+```bash
+make dc-stop-postgres
+docker volume rm mithril_postgres_data
+make dc-up-postgres
+```
+
+**`migrate-up` fails: wrong database or auth**
+
+Ensure `.env` matches compose: `DB_NAME=mithril_rev`, `DB_USER=postgres`, empty `DB_PASSWORD` with trust auth. Or set:
+
+```bash
+DATABASE_URL=postgres://postgres@localhost:5432/mithril_rev?sslmode=disable
+```
+
+**Server won't start (database ping)**
+
+In development the app warns and continues without DB. For a DB-less preview, comment out `DB_HOST` in `.env`. Production (`APP_ENV=production`) requires a working database.
+
+**Admin panel 404**
+
+Run `mithril admin-enable`, then **restart** the server.
 
 ## Next Steps
 

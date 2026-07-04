@@ -48,15 +48,20 @@ mithril --version
 ```bash
 mithril new my-awesome-app
 cd my-awesome-app
-cp env.example .env
 ```
 
-`mithril new` clones the framework template, removes `.git`, copies `env.example` to `.env`, and runs `go mod tidy`.
+`mithril new` clones the framework, removes dev cruft (`.git`, stray binaries), rewrites the Go module to your project name, copies `env.example` → `.env`, and runs `go mod tidy`.
+
+Custom module path:
+
+```bash
+mithril new -module github.com/acme/api my-api
+```
 
 ## Start Developing
 
 ```bash
-# Start PostgreSQL (Docker)
+# Start PostgreSQL (Docker) — trust auth, database mithril_rev
 make dc-up-postgres
 
 # Run migrations
@@ -68,6 +73,8 @@ mithril createsuperuser
 # Run server (port 4000)
 mithril run
 ```
+
+If Postgres is down, the dev server still starts with limited routes (warning in logs). Use `APP_ENV=production` to require DB.
 
 Visit:
 
@@ -105,7 +112,9 @@ Key variables:
 |----------|-------------|
 | `PORT` | HTTP port (default `4000`) |
 | `JWT_SECRET` | **Required** when `APP_ENV=production` |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (overrides `DB_*`) |
+| `DB_HOST` | Set for PostgreSQL; comment out to run without DB |
+| `DB_NAME` | Default `mithril_rev` (matches docker-compose) |
 | `ENABLE_REGISTER` | Set `true` to allow `POST /auth/register` |
 | `ENABLE_COMPRESSION` | Enable gzip responses |
 | `ENABLE_HELMET` | Security headers |
@@ -142,12 +151,25 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 
 **Database connection failed**
 
-Ensure Postgres is running and `DATABASE_URL` in `.env` matches your setup. With Docker:
+Ensure Postgres is running and `.env` matches docker-compose:
 
 ```bash
 make dc-up-postgres
-# Default DB: mithril_rev on localhost:5432
+# Defaults: user postgres, database mithril_rev, trust auth (no password)
 ```
+
+**Postgres container won't stay running**
+
+On a fresh Docker volume, Postgres 16 needs `POSTGRES_HOST_AUTH_METHOD=trust` or a non-empty password. Reset:
+
+```bash
+docker volume rm mithril_postgres_data
+make dc-up-postgres
+```
+
+**Run without a database**
+
+Comment out `DB_HOST` in `.env` to preview `/`, `/health`, and `/docs` while debugging Postgres.
 
 **Go version mismatch**
 

@@ -43,8 +43,9 @@ docker run --rm -p 4000:4000 \
 | Service | Port | Command |
 |---------|------|---------|
 | postgres | 5432 | `make dc-up-postgres` |
-| pgadmin | 5050 | `make dc-up-pgadmin` |
+| pgadmin | 5051 | `make dc-up-pgadmin` |
 | adminer | 8080 | `make dc-up-adminer` |
+| embedded DBMS | 5050 | `mithril dbms` (app command, not compose) |
 | redis | 6379 | `make dc-up-redis` |
 | rabbitmq | 5672 | `make dc-up-rabbitmq` |
 | kafka | 9092 | `make dc-up-kafka` |

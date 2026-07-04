@@ -42,8 +42,8 @@ make dc CMD=logs SVC=redis
 
 | Service | Host port | Notes |
 |---------|-----------|-------|
-| postgres | 5432 | DB `mithril_rev`, user `postgres` |
-| pgadmin | 5050 | Web UI (conflicts with DBMS port — use one at a time) |
+| postgres | 5432 | DB `mithril_rev`, trust auth |
+| pgadmin | 5051 | Web UI (5050 reserved for embedded DBMS) |
 | adminer | 8080 | Generic DB UI |
 | redis | 6379 | Cache / queues (planned integration) |
 | rabbitmq | 5672 | Message broker (planned) |
