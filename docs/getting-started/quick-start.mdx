@@ -98,10 +98,10 @@ Add a route in `routes/web.go` or create `routes/hello.go`:
 ```go
 package routes
 
-import "github.com/gofiber/fiber/v2"
+import "github.com/gofiber/fiber/v3"
 
 func SetupHelloRoutes(app *fiber.App) {
-	app.Get("/api/hello", func(c *fiber.Ctx) error {
+	app.Get("/api/hello", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"message": "Hello from Mithril!"})
 	})
 }
