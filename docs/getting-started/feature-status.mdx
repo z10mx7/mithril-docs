@@ -9,7 +9,7 @@ Every page in these docs carries one of three labels:
 
 | Label | Meaning |
 | --- | --- |
-| <Status value="shipped" /> | In the current release (v1.2) and covered by tests. |
+| <Status value="shipped" /> | In the current release (v1.3) and covered by tests. |
 | <Status value="beta" /> | Available, but the API may change before 2.0. Feedback welcome. |
 | <Status value="planned" /> | Not implemented yet. Code on that page shows the intended design, not something you can import today. |
 
@@ -22,7 +22,12 @@ Every page in these docs carries one of three labels:
 | Typed configuration from env / `.env` | <Status value="shipped" /> | `config` |
 | Fiber v3 HTTP stack (request ID, recover, logger, CORS) | <Status value="shipped" /> | `app` |
 | Security headers (Helmet), on by default | <Status value="shipped" /> | `ENABLE_HELMET` |
-| Gzip / Brotli compression | <Status value="shipped" /> | `ENABLE_COMPRESSION` |
+| Gzip / Brotli compression (best speed) | <Status value="shipped" /> | `ENABLE_COMPRESSION` |
+| [Performance defaults](/docs/core/performance) (errors-only logs, one ACL query, CPU-sized pool, timeouts) | <Status value="beta" /> | `app.New` |
+| Graceful shutdown on SIGTERM | <Status value="shipped" /> | `app.Main` |
+| Real client IPs behind a trusted proxy | <Status value="shipped" /> | `TRUST_PROXY`, `PROXY_HEADER` |
+| Private pprof listener, `make bench` / `make profile` | <Status value="beta" /> | `PPROF_ADDR` |
+| Prefork / high-throughput mode (opt-in) | <Status value="beta" /> | `PREFORK`, `HIGH_THROUGHPUT` |
 | Management commands (`go run . migrate`, `routes`, `openapi`, …) | <Status value="beta" /> | `app.Main` |
 | Single self-contained binary (`embed.FS` migrations, views, assets) | <Status value="beta" /> | `app.WithMigrations`, `WithViews`, `WithStatic` |
 | Jet templates | <Status value="shipped" /> | `app.WithViews` |

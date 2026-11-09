@@ -49,6 +49,10 @@ export const sidebarNav = [
         href: '/docs/core/resources',
       },
       {
+        title: 'Performance',
+        href: '/docs/core/performance',
+      },
+      {
         title: 'Configuration',
         href: '/docs/core/configuration',
       },

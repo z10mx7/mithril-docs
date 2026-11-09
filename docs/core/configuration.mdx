@@ -34,6 +34,16 @@ cfg, err := config.FromEnv()   // what app.New does for you
 | `ENABLE_MONITOR` | `false` | `/monitor` dashboard, superusers only |
 | `APP_TIMEZONE` / `TZ` | `UTC` | Process time zone (IANA name) |
 | `DBMS_ADDR` | `127.0.0.1:5050` | Address for `go run . dbms` |
+| `LOG_REQUESTS` | `errors` | `errors` (status ≥ 400), `all` or `none` |
+| `TRUST_PROXY` / `PROXY_HEADER` | `true` / `X-Real-IP` | Client IP from the header, honoured only when the peer is loopback/private |
+| `DB_MAX_CONNS` / `DB_MIN_CONNS` | 4 per CPU (10–50) / `2` | Connection pool size (`pool_max_conns` in the URL wins) |
+| `READ_TIMEOUT` / `WRITE_TIMEOUT` / `IDLE_TIMEOUT` | `30s` / `30s` / `120s` | Go durations or seconds; `0` disables |
+| `BODY_LIMIT` | `4194304` | Maximum request body in bytes |
+| `PPROF_ADDR` | — | Private pprof listener (loopback only unless `PPROF_ALLOW_REMOTE=true`) |
+| `PREFORK` | `false` | One process per CPU (Linux, stateless apps only) |
+| `HIGH_THROUGHPUT` | `false` | Skip `Date` and default `Content-Type` headers |
+
+See [Performance](/docs/core/performance) for what each setting buys.
 
 Booleans accept `1`, `true`, `yes` and `on`.
 

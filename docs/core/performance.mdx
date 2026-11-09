@@ -1,0 +1,79 @@
+---
+title: 'Performance'
+description: 'Fast by default: what Mithril tunes for you, and how to measure your app'
+---
+
+# Performance
+
+<PageStatus value="beta">
+These defaults shipped in v1.3. Every app built with `app.New` gets them; no code changes needed.
+</PageStatus>
+
+Mithril runs on Fiber v3 (fasthttp), so the framework itself is rarely the limit. Capacity is usually lost to per-request work around your handlers: log lines, database round trips, an undersized connection pool, compression settings, proxies. Mithril tunes these by default.
+
+## Defaults
+
+| Default | Why | Override |
+| --- | --- | --- |
+| `sonic` JSON encoder and decoder | 2–3× faster than `encoding/json` on typical payloads | — |
+| Request log **only for status ≥ 400** | Logging every request cut throughput by ~30% on small responses | `LOG_REQUESTS=all` or `none` |
+| One query for all permission checks in a request | The superuser flag and permission set load together and are cached for the request | — |
+| Resource lists in one round trip (`count(*) OVER()`) | Page and total come back together | — |
+| DB pool sized to the CPUs (4 per core, 10–50) | A fixed 10 made requests queue for a connection | `DB_MAX_CONNS`, `DB_MIN_CONNS`, or `pool_max_conns` in the URL |
+| Compression at best speed (when enabled) | The default level cost ~18% CPU on small JSON | `ENABLE_COMPRESSION` (or compress in nginx) |
+| Real client IPs behind a proxy | `X-Real-IP` is honoured **only** from loopback/private peers, with IP validation, so it can't be spoofed from the internet | `TRUST_PROXY`, `PROXY_HEADER` |
+| Read/write/idle timeouts: 30 s / 30 s / 120 s | Slow clients can't hold connections forever | `READ_TIMEOUT`, `WRITE_TIMEOUT`, `IDLE_TIMEOUT` |
+| Graceful shutdown on SIGINT/SIGTERM (10 s) | Deploys finish in-flight requests instead of being SIGKILLed | — |
+| Cached `/openapi.json` | Rendered once, not per request | — |
+
+### Measured effect
+
+Reference app, same data and load (`oha`, keep-alive, 64 connections, 10 s per route, PostgreSQL in Docker, Apple M-series, macOS loopback):
+
+| Route | v1.2 | v1.3 | |
+| --- | --- | --- | --- |
+| `GET /` | 57,043 req/s · p99 4.93 ms | 81,220 req/s · p99 0.98 ms | +42% |
+| `GET /api/blogs` (list, non-superuser) | 4,237 req/s · p50 14.7 ms | 14,022 req/s · p50 4.2 ms | **3.3×** |
+| `GET /api/blogs/:id` | 5,881 req/s · p50 10.6 ms | 17,142 req/s · p50 3.5 ms | **2.9×** |
+
+Isolated contributions: fewer queries gave about 1.6× on DB routes (same pool size), the CPU-sized pool roughly doubled that, and errors-only logging gave the whole +42% on `GET /`. After the changes, a CPU profile of the list route is mostly network syscalls, and PostgreSQL is the next limit. These are relative numbers: macOS loopback caps absolute throughput far below Linux (see below).
+
+## Opt-in: maximum throughput
+
+For **stateless** services (API gateways, token checks, redirects, cache fronts):
+
+| Setting | Effect | Caveat |
+| --- | --- | --- |
+| `PREFORK=true` | One process per CPU on the same port (`SO_REUSEPORT`). Throughput scales nearly linearly with cores. | **Linux only.** Each process has its own memory, so never use it with in-memory state (rate limits, caches, rooms, WebSocket hubs). The default DB pool drops to 4 per process. |
+| `HIGH_THROUGHPUT=true` | Skips the `Date` and default `Content-Type` headers | Saves well under a microsecond per request; only matters at very high request rates. Set `Content-Type` yourself on non-JSON responses. |
+
+## Measuring your app
+
+New projects include the tooling:
+
+```bash
+PPROF_ADDR=127.0.0.1:6060 go run .     # private profiler (refuses non-loopback addresses)
+make bench                              # oha, keep-alive: URL=... C=64 D=15s
+make profile                            # 30 s CPU profile, run while the load test is going
+```
+
+Rules that keep the numbers honest:
+
+1. **Measure before changing anything,** and change one thing at a time with the same load.
+2. **Simulate real users,** not one endpoint: the real mix of reads, writes and think time.
+3. **Keep connections alive.** A client that opens a TCP/TLS connection per request measures handshakes.
+4. **Don't benchmark on macOS loopback** and call it the server's limit: it caps around 150–170k req/s whatever you tune. Run the client next to the server in the same Linux VM or Docker network.
+5. **Read the profile:** `go tool pprof -top`, then `-top -cum` and `-peek <func>` to find who calls the hot function. The healthy end state is mostly network syscalls.
+6. **Check what you're measuring:** make sure the process that owns the port is the binary you just built.
+
+Database work dominates most real routes: keep round trips per request low (no query per row), and add indexes for the columns you filter and sort by. Resource lists sort by `created_at`; the generated migrations index it.
+
+## Production checklist
+
+- [ ] nginx in front, one hop to the app, published on loopback only. New projects include `deploy/nginx.conf.example` (upstream keep-alive, `X-Real-IP`, gzip at level 1).
+- [ ] nginx `worker_connections 8192` and `worker_rlimit_nofile 32768`. The Ubuntu default of 768 caps you at a few hundred concurrent clients.
+- [ ] Compression in nginx; `ENABLE_COMPRESSION` off in the app.
+- [ ] `LOG_REQUESTS` left at `errors`.
+- [ ] `DB_MAX_CONNS` × instances stays under PostgreSQL's `max_connections`.
+- [ ] `PPROF_ADDR` unset (or loopback) in production.
+- [ ] `PREFORK` only for stateless services on Linux.
