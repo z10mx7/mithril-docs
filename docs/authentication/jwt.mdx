@@ -5,6 +5,8 @@ description: 'JWT authentication in Mithril'
 
 # JWT Authentication
 
+<PageStatus value="shipped" />
+
 Mithril implements JSON Web Token authentication with access and refresh token pairs in `internal/auth/`.
 
 ## Endpoints
@@ -12,8 +14,8 @@ Mithril implements JSON Web Token authentication with access and refresh token p
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/auth/login` | Email + password → tokens |
-| POST | `/auth/refresh` | Refresh access token |
-| POST | `/auth/logout` | Clear cookies |
+| POST | `/auth/refresh` | Exchange a refresh token for a new pair (public: no access token needed) |
+| POST | `/auth/logout` | Clear cookies (JWT required) |
 | GET | `/auth/me` | Current user (JWT required) |
 | POST | `/auth/register` | Register (only if `ENABLE_REGISTER=true`) |
 
@@ -42,7 +44,7 @@ curl http://localhost:4000/auth/me \
   -H "Authorization: Bearer <access_token>"
 ```
 
-Protected API routes under `/api/*` use JWT middleware + ACL claims middleware.
+Protected routes (`/api/*`, `/auth/me`, `/auth/logout`, `/admin/api/*`) accept **access tokens only**. A refresh token sent as a bearer token is rejected with 401, and only HS256 signatures are accepted.
 
 ## Token Claims
 
@@ -61,15 +63,25 @@ JWT_SECRET=your-secret-change-in-production
 ENABLE_REGISTER=true   # optional; disabled by default
 ```
 
-When `APP_ENV=production`, `JWT_SECRET` **must** be set or the server refuses to start.
+Unless `APP_ENV` is `development`/`test`, the server refuses to start when `JWT_SECRET` is missing, shorter than 32 bytes or a published placeholder (such as `change-me-in-production`). **An unset `APP_ENV` counts as production.** In development an empty secret is replaced with a random one per process. `mithril new` generates a strong secret into `.env`.
 
 ## Refresh Flow
+
+`/auth/refresh` accepts only refresh tokens (`type: "refresh"`), reloads roles and superuser status from the database, and refuses disabled accounts. The `refresh_token` cookie (set with `"remember": true`) works too.
 
 ```bash
 curl -X POST http://localhost:4000/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refresh_token":"<refresh_token>"}'
 ```
+
+## Limitations
+
+<PageStatus value="planned">
+Tokens are stateless: logout clears cookies but can't revoke a token, and access tokens live for 24 hours.
+Server-side sessions with refresh-token rotation and revocation, shorter access tokens, and the 501 endpoints
+(password reset, OTP, 2FA) are on the roadmap.
+</PageStatus>
 
 ## Next Steps
 

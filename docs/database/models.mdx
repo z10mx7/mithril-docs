@@ -1,83 +1,55 @@
 ---
-title: 'Models & Relationships'
-description: 'Database models and the repository pattern in Mithril'
+title: 'Models'
+description: 'Plain structs, used by resources and repositories'
 ---
 
-# Models & Relationships
+# Models
 
-Mithril uses plain Go structs in `database/models/` with [pgx](https://github.com/jackc/pgx) for PostgreSQL access and a repository layer in `database/repositories/`.
+<PageStatus value="shipped">
+Models are plain Go structs. Declarative CRUD on top of them is described in [Resources](/docs/core/resources) <Status value="beta" />.
+</PageStatus>
 
-## Model Conventions
-
-- One file per model, **lowercase filename**: `user.go`, `blog.go`
-- Struct names are PascalCase: `User`, `Blog`
-- UUID primary keys via `github.com/google/uuid`
-- Timestamps: `CreatedAt`, `UpdatedAt` as `time.Time`
-
-### User model
+Mithril has no ORM: a model is a struct whose tags describe its JSON and columns, and the migration defines the table.
 
 ```go
-type User struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	IsActive     bool      `json:"is_active"`
-	IsSuperuser  bool      `json:"is_superuser"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+package models
+
+type Product struct {
+    ID        uuid.UUID `json:"id"`
+    Name      string    `json:"name" validate:"required,max=255"`
+    Price     float64   `json:"price"`
+    OwnerID   uuid.UUID `json:"owner_id" mithril:"owner"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
 }
 ```
 
-### Blog model (with foreign key)
+## Three ways to use a model
+
+| Approach | When |
+| --- | --- |
+| **[Resource](/docs/core/resources)**: `resource.Define[models.Product](...)` | Standard CRUD with permissions, OpenAPI and admin. Start here. |
+| **Typed handler + pgx**: `a.DB().Query(...)` inside an `api.Get` handler | Custom queries, reports, joins |
+| **Repository struct** wrapping `*pgxpool.Pool` | Shared query logic used by several handlers |
 
 ```go
-type Blog struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
+api.Get(a.API, "/reports/cheap-products", func(c fiber.Ctx, _ *api.Empty) (*[]models.Product, error) {
+    rows, err := a.DB().Query(c, `SELECT id, name, price, owner_id, created_at, updated_at
+                                  FROM products WHERE price < 10 ORDER BY price`)
+    if err != nil {
+        return nil, err
+    }
+    items, err := pgx.CollectRows(rows, pgx.RowToStructByPos[models.Product])
+    return &items, err
+}, api.Op{Summary: "Products under 10"}, a.RequirePermission("products.view"))
 ```
 
-`author_id` references `users(id)` — defined in goose migrations.
+## Built-in models
 
-## Repositories
+`database/models` contains `User`, `Role` and `Permission`, and `database/repositories` holds their repositories (`UserRepository`, `ACLRepository`). They are available as `a.Users()` and `a.ACL()`.
 
-Repositories encapsulate SQL and live in `database/repositories/`:
+## Planned
 
-```go
-type BlogRepository struct {
-	db *pgxpool.Pool
-}
-
-func NewBlogRepository(db *pgxpool.Pool) *BlogRepository {
-	return &BlogRepository{db: db}
-}
-
-func (r *BlogRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Blog, error) {
-	// ...
-}
-```
-
-Standard methods: `Create`, `GetByID`, `Update`, `Delete`, `List`.
-
-## ACL models
-
-Role/permission tables are defined in `database/models/acl.go` and managed via the [RBAC](/docs/authentication/rbac) system.
-
-## Adding a New Model
-
-1. Create `database/models/yourmodel.go`
-2. Add a goose migration in `database/migrations/`
-3. Run `mithril migrate-up`
-4. Optionally generate CRUD: `mithril crud MODEL=Yourmodel`
-
-## Next Steps
-
-- [Migrations](/docs/database/migrations)
-- [Seeders](/docs/database/seeders)
+<PageStatus value="planned">
+Relationship helpers (preloading related rows in resources) and `migrate-gen` (generate migrations from model changes) are on the roadmap.
+</PageStatus>

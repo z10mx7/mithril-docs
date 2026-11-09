@@ -1,109 +1,81 @@
 ---
 title: "CLI Overview"
-description: "Complete guide to Mithril's command-line interface"
+description: "The global mithril CLI and your app's built-in commands"
 ---
 
 # CLI Overview
 
-Mithril provides a global CLI (`mithril`) and project commands that delegate to `make`.
+<PageStatus value="beta">
+The command set was reorganized in v1.2: project commands now run inside your app (`go run . <command>`) instead of through `make`.
+</PageStatus>
 
-## Global Commands
+There are two layers:
 
-```bash
-mithril --version          # Show version (alias: version, ping)
-mithril init               # Symlink CLI to /usr/local/bin
-mithril new <name>         # Scaffold new project (git clone + setup)
-mithril help               # Usage
-```
+1. **`mithril`** (global CLI): creates projects, runs generators, and forwards everything else to your app.
+2. **Your app's binary**: every Mithril app understands management commands, much like Django's `manage.py`. `mithril migrate up` inside a project is exactly `go run . migrate up`, and in production you run `./app migrate up`.
 
-## Project Commands
-
-Inside a Mithril project (detected by `go.mod` + `Makefile`), any make target works:
-
-```bash
-cd my-app
-mithril run
-mithril run-dev
-mithril migrate-up
-mithril crud MODEL=Blog
-mithril seed
-mithril createsuperuser
-mithril backup
-mithril swagger
-mithril admin-enable
-mithril dbms
-```
-
-Equivalent to `./mithril <target>` or `make <target>`.
-
-## Development
+## Global commands
 
 | Command | Description |
-|---------|-------------|
-| `mithril install` | `go mod tidy && go mod download` |
-| `mithril run` | `go run .` |
-| `mithril run-dev` | Air live reload |
-| `mithril build` | `go build -o bin/app .` |
-| `mithril test` | `go test -v ./...` |
-| `mithril routes` | Print registered routes |
-| `mithril kill` | Stop dev server / Air |
+| --- | --- |
+| `mithril new [-module path] [-local path] <name>` | Create a project from the built-in template. `-local` points `go.mod` at a local framework checkout (for contributors). |
+| `mithril make:resource <Model> [fields...] [--owner] [--name table] [--dry-run]` | Generate a [resource](/docs/core/resources): model, migration and registration. Fields are `name:type` or `name:type:required`. |
+| `mithril --version`, `mithril help` | Version and usage |
+| `mithril init` | Symlink the CLI into `/usr/local/bin` |
 
-## Database
+## App commands
 
 | Command | Description |
-|---------|-------------|
-| `mithril migrate-up` | Apply goose migrations |
-| `mithril migrate-down` | Roll back one migration |
-| `mithril migrate-status` | Migration status |
-| `mithril migrate-reset` | Reset DB (destructive) |
-| `mithril seed` | Run seed data |
-| `mithril backup` | Database backup |
-| `mithril restore` | Restore from backup |
-| `mithril backup-list` | List backups |
-
-## Code Generation
+| --- | --- |
+| `serve` (default) | Start the HTTP server |
+| `migrate up` | Apply core and app migrations, then create resource permissions |
+| `migrate down` | Roll back the latest **app** migration (core migrations are never rolled back) |
+| `migrate status` | Applied and pending migrations |
+| `routes [--json]` | Every route |
+| `openapi [-o file]` | The OpenAPI 3.1 document |
+| `resources` | Registered resources as JSON (fields, permissions, paths) |
+| `createsuperuser [--email E --password P] [--first-name F --last-name L]` | Create a superuser (interactive without flags; also reads `CREATESUPERUSER_EMAIL` / `CREATESUPERUSER_PASSWORD`) |
+| `acl …` | Roles, permissions and superusers (see below) |
+| `dbms [addr]` | Embedded PostgreSQL web UI (default `127.0.0.1:5050`) |
+| `mcp` | [MCP server](/docs/ai/agents) on stdio for AI coding agents |
+| `version`, `help` | |
 
 ```bash
-mithril crud MODEL=User
-go run ./cmd/crud --dry-run Blog
+mithril new -module github.com/acme/shop shop
+cd shop
+docker compose up -d postgres
+mithril migrate up
+mithril createsuperuser --email admin@acme.test --password 'change-me-now'
+mithril make:resource Product name:string:required price:float --owner
+mithril migrate up
+mithril serve
 ```
 
 ## ACL
 
 ```bash
-mithril acl-role-create NAME=editor
-mithril acl-permission-create NAME=blogs.view
-mithril acl-assign-role EMAIL=user@example.com ROLE=editor
-mithril acl-superuser-set EMAIL=admin@example.com
+mithril acl superuser set|unset EMAIL
+mithril acl role create NAME [description]
+mithril acl role delete NAME
+mithril acl permission create CODENAME [description]
+mithril acl assign role USER_EMAIL ROLE_NAME
+mithril acl assign permission role ROLE_NAME CODENAME
+mithril acl assign permission user USER_EMAIL CODENAME
+mithril acl revoke role|permission ...
+mithril acl list permissions|roles
 ```
 
-Run `make acl` for full ACL help.
+## Framework repository (contributors)
 
-## Utilities
+The framework repo is itself a Mithril app (the reference app with the `blogs` example). Its `Makefile` wraps the same commands (`make run`, `make migrate-up`, `make routes`, `make openapi`, `make createsuperuser`) and adds framework-only tooling: `make backup` / `make restore`, `make seed`, Docker dev services (`make dc-up-postgres`, …) and `make test`.
 
-```bash
-mithril secret              # Generate random secret
-mithril hash TEXT=password  # bcrypt hash
-mithril sha256 TEXT=hello
-mithril encode TEXT=hello   # Base64 encode
-mithril decode TEXT=aGVsbG8=  # Base64 decode
-```
+Projects created before v1.2 (full clones of the framework) keep working: `mithril <target>` still delegates to `make` when the project doesn't import Mithril as a library.
 
-## Admin & DBMS
+## Removed in 1.2
 
-```bash
-mithril admin-enable / admin-disable
-mithril dbms-enable / dbms-disable
-mithril dbms                # Start embedded DBMS on :5050
-```
-
-## Install Script
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
-```
-
-## Next Steps
-
-- [Docker & Services](/docs/cli/docker-services)
-- [Migrations](/docs/database/migrations)
+| Old | Replacement |
+| --- | --- |
+| `mithril crud MODEL=X` | `mithril make:resource X ...` |
+| `mithril swagger` (OpenAI) | `/openapi.json`, `mithril openapi` (generated from types, offline) |
+| `mithril migrate-reset` | `mithril migrate down` / recreate the database |
+| `LIST_ROUTES=1 go run .` | `mithril routes` |

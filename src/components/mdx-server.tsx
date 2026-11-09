@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import { Note } from '@/components/note';
 import { PlannedFeatureBanner } from '@/components/planned-feature-banner';
+import { Status, PageStatus } from '@/components/status';
 
 const components = {
   h1: ({ className, ...children }: React.HTMLAttributes<HTMLElement>) => (
@@ -130,6 +131,8 @@ const components = {
   ),
   Note,
   PlannedFeatureBanner,
+  Status,
+  PageStatus,
 };
 
 interface MdxProps {

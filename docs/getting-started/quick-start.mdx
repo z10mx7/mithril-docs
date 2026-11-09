@@ -1,299 +1,102 @@
 ---
 title: 'Quick Start'
-description: 'Create your first Mithril application in minutes'
+description: 'From zero to a CRUD API with auth, OpenAPI and an admin panel'
 ---
 
 # Quick Start
 
-Get a Mithril app running in a few minutes.
+<PageStatus value="beta">
+This is the v1.2 workflow (Mithril as a library). Requires Go 1.26+ and Docker (or any PostgreSQL 14+).
+</PageStatus>
 
 ## 1. Install the CLI
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
+go install github.com/mithril-framework/mithril/cmd/mithril@latest
 ```
 
-## 2. Create a Project
+## 2. Create a project
 
 ```bash
-mithril new hello-mithril
-cd hello-mithril
-mithril install
+mithril new -module github.com/you/shop shop
+cd shop
 ```
 
-`mithril new` copies `env.example` to `.env` and sets `APP_NAME` to your project name. The Go module defaults to `github.com/your-user/project-name` when GitHub CLI (`gh`) or `git config github.user` is available; otherwise the folder name is used. A tip is printed after scaffold when the module path is not under `github.com/`. Override with `-module`:
+You get a small project that **imports** Mithril: `main.go`, `resources.go`, `routes.go`, `models/`, `migrations/`, a `.env` with a freshly generated `JWT_SECRET`, a Dockerfile, `AGENTS.md` and `.mcp.json`. See [Application Structure](/docs/core/application).
+
+## 3. Start PostgreSQL and migrate
 
 ```bash
-mithril new -module github.com/acme/api my-api
+docker compose up -d postgres
+mithril migrate up
+mithril createsuperuser --email admin@shop.test --password 'change-me-now'
 ```
 
-## 3. Start PostgreSQL
+`migrate up` creates Mithril's core tables (users, roles, permissions) and applies your own migrations.
+
+## 4. Run it
 
 ```bash
-make dc-up-postgres
-mithril migrate-up
+mithril serve
 ```
 
-Create a login user — pick one:
-
-```bash
-# Fastest for local dev (demo credentials)
-mithril seed
-
-# Interactive superuser (TTY required for password)
-mithril createsuperuser
-
-# Non-interactive superuser (CI / scripts)
-mithril createsuperuser --email admin@example.com --password 'your-secure-password'
-```
-
-After `mithril seed`, log in with **`user@example.com`** / **`password`**.
-
-The Docker Postgres service uses **trust auth** and database **`mithril_rev`** — matching the defaults in `.env`.
-
-## 4. Run the Server
-
-```bash
-mithril run-dev   # live reload with Air
-# or: mithril run
-```
-
-If Postgres is not running, the app still starts in development with a warning (/, `/health`, `/docs` work). Set `APP_ENV=production` to require a working database.
-
-## 5. Visit Your App
-
-| URL | Description |
-|-----|-------------|
-| http://localhost:4000 | API root |
-| http://localhost:4000/docs | Swagger UI |
+| URL | What |
+| --- | --- |
+| http://localhost:4000/hello?name=Ada | The example typed endpoint in `routes.go` |
+| http://localhost:4000/docs | Swagger UI, generated from your Go types |
+| http://localhost:4000/admin | Admin panel (sign in with the superuser) |
 | http://localhost:4000/health | Health check |
-| http://localhost:4000/monitor | System monitor |
-| http://localhost:4000/admin | Admin panel (after `mithril admin-enable` + restart) |
-| http://localhost:5050 | Embedded DBMS (after `mithril dbms-enable && mithril dbms`) |
-| http://localhost:5051 | pgAdmin (when `make dc-up-pgadmin`) |
 
-## Project Structure
-
-```
-hello-mithril/
-├── main.go                 # Fiber app bootstrap
-├── routes/                 # register.go, auth, CRUD, admin
-├── internal/               # auth, acl, admin, crud handlers
-├── database/
-│   ├── models/             # User, Blog, ACL structs
-│   ├── repositories/       # pgx data access
-│   └── migrations/         # goose SQL files
-├── cmd/                    # mithril, crud, acl, seed, backup, …
-├── pkg/utils/              # hash, encrypt, validation helpers
-├── public/admin/           # Admin SPA
-├── infrastructure/         # Docker compose, K8s
-├── Makefile
-└── mithril                 # delegates to make
-```
-
-## Your First API Endpoint
-
-Add a route in `routes/web.go` or create `routes/hello.go`:
-
-```go
-package routes
-
-import "github.com/gofiber/fiber/v3"
-
-func SetupHelloRoutes(app *fiber.App) {
-	app.Get("/api/hello", func(c fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Hello from Mithril!"})
-	})
-}
-```
-
-Register it in `routes/register.go` inside `RegisterAll`:
-
-```go
-SetupHelloRoutes(app)
-```
-
-Test:
+## 5. Add a resource
 
 ```bash
-curl http://localhost:4000/api/hello
+mithril make:resource Product name:string:required description:text price:float in_stock:bool --owner
+mithril migrate up
+mithril serve
 ```
 
-## Database Model & Migration
+That one command wrote `models/product.go`, a migration, and a line in `resources.go`. You now have:
 
-### 1. Create a model
+- `GET/POST /api/products`, `GET/PATCH/PUT/DELETE /api/products/:id`, validated and paginated
+- `products.view/add/change/change_any/delete/delete_any` permissions (owners manage their own rows)
+- a **Products** page in the admin panel
+- the operations in `/openapi.json` and `/docs`
 
-Add `database/models/article.go`:
-
-```go
-package models
-
-import (
-	"time"
-	"github.com/google/uuid"
-)
-
-type Article struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	AuthorID  uuid.UUID `json:"author_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-```
-
-### 2. Write a goose migration
-
-Create `database/migrations/0008_articles.sql`:
-
-```sql
--- +goose Up
-CREATE TABLE articles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT NOT NULL DEFAULT '',
-    content TEXT NOT NULL DEFAULT '',
-    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- +goose Down
-DROP TABLE IF EXISTS articles;
-```
-
-<Note>
-`migrate-gen` (auto-generate SQL from models) is planned — write migrations manually with goose for now.
-</Note>
-
-### 3. Run migrations
+## 6. Call the API
 
 ```bash
-mithril migrate-up
+TOKEN=$(curl -s localhost:4000/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@shop.test","password":"change-me-now"}' | jq -r .data.tokens.access_token)
+
+curl -s localhost:4000/api/products -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Mug","price":9.5,"in_stock":true}'
+
+curl -s localhost:4000/api/products -H "Authorization: Bearer $TOKEN"
+# {"items":[{"id":"…","name":"Mug","price":9.5,…}],"total":1,"limit":20,"offset":0}
 ```
 
-## Generate CRUD
+Give regular users access through roles:
 
 ```bash
-mithril crud MODEL=Blog
+mithril acl role create seller
+mithril acl assign permission role seller products.add
+mithril acl assign permission role seller products.change   # own products only
+mithril acl assign role ada@shop.test seller
 ```
 
-This generates:
-
-- `database/repositories/blog_repository.go` (skipped if exists)
-- `internal/crud/blog/handlers.go`
-- `routes/crud_blog.go`
-- Updates `routes/register.go` with `MountCrudBlogRoutes`
-
-Dry run:
+## 7. Ship it
 
 ```bash
-go run ./cmd/crud --dry-run Blog
+docker build -t shop .
+docker run --rm --env-file .env shop migrate up
+docker run --rm -p 4000:4000 --env-file .env shop
 ```
 
-API routes (JWT + ACL required):
+The binary embeds its migrations: see [Docker & Single Binary](/docs/deployment/docker).
 
-- `GET /api/blogs`
-- `POST /api/blogs`
-- `GET /api/blogs/:id`
-- `PUT /api/blogs/:id`
-- `DELETE /api/blogs/:id`
+## Next steps
 
-## Authentication Quick Test
-
-After `mithril seed` (recommended for first run):
-
-```bash
-curl -X POST http://localhost:4000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password"}'
-```
-
-Or after `mithril createsuperuser` with your own email/password:
-
-```bash
-curl -X POST http://localhost:4000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"your-password"}'
-
-# Use access_token from response
-curl http://localhost:4000/auth/me \
-  -H "Authorization: Bearer <access_token>"
-```
-
-## Common CLI Commands
-
-```bash
-mithril --version        # alias: mithril version, mithril ping
-mithril migrate-up
-mithril migrate-down
-mithril migrate-status
-mithril seed
-mithril backup
-mithril swagger          # requires OPENAI_API_KEY
-mithril acl-role-create NAME=editor
-mithril admin-enable     # restart server after enabling
-mithril routes           # LIST_ROUTES=1 go run .
-```
-
-## Troubleshooting
-
-**`migrate-up` says "no migrations to run" on a new project**
-
-Your local Docker volume may already have Mithril migrations from a previous project. Run `mithril migrate-status` — if all migrations show as applied, you are ready for `mithril seed`. For a blank database: `docker volume rm mithril_postgres_data && make dc-up-postgres`.
-
-**Postgres container exits immediately**
-
-Older compose files used `POSTGRES_PASSWORD=""`, which Postgres 16 rejects on a fresh volume. Current compose uses `POSTGRES_HOST_AUTH_METHOD=trust`. Reset the volume if needed:
-
-```bash
-make dc-stop-postgres
-docker volume rm mithril_postgres_data
-make dc-up-postgres
-```
-
-**`migrate-up` fails: wrong database or auth**
-
-Ensure `.env` matches compose: `DB_NAME=mithril_rev`, `DB_USER=postgres`, empty `DB_PASSWORD` with trust auth. Or set:
-
-```bash
-DATABASE_URL=postgres://postgres@localhost:5432/mithril_rev?sslmode=disable
-```
-
-**Server won't start (database ping)**
-
-In development the app warns and continues without DB. For a DB-less preview, comment out `DB_HOST` in `.env`. Production (`APP_ENV=production`) requires a working database.
-
-**Admin panel 404**
-
-Run `mithril admin-enable`, then **restart** the server.
-
-**`mithril --version` prints `dev` or scaffold output**
-
-Another `mithril` binary is on your PATH. Install the framework CLI and prefer `$(go env GOPATH)/bin`:
-
-```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2
-export PATH="$(go env GOPATH)/bin:$PATH"
-mithril --version   # expect: mithril 1.0.2 (github.com/mithril-framework/mithril)
-```
-
-Or run `sudo $(go env GOPATH)/bin/mithril init` to replace `/usr/local/bin/mithril` (removes old scaffold CLIs).
-
-**Port 4000 already in use**
-
-Another process is bound to `:4000` (often a previous `mithril run`):
-
-```bash
-mithril kill
-# requires lsof (macOS: /usr/sbin/lsof — use a full PATH if needed)
-# or: /usr/sbin/lsof -ti:4000 | xargs kill
-mithril run
-```
-
-## Next Steps
-
-- [Models & repositories](/docs/database/models)
-- [JWT authentication](/docs/authentication/jwt)
-- [RBAC](/docs/authentication/rbac)
-- [Docker deployment](/docs/deployment/docker)
+- [Resources](/docs/core/resources): tags, options and permission rules
+- [Typed Handlers & Validation](/docs/api/validation): custom endpoints
+- [AI Agents & MCP](/docs/ai/agents): let your coding agent work with real app metadata
+- [Feature Status](/docs/getting-started/feature-status): what's shipped, beta and planned

@@ -1,0 +1,84 @@
+---
+title: 'Feature Status'
+description: 'What ships today, what is beta, and what is planned'
+---
+
+# Feature Status
+
+Every page in these docs carries one of three labels:
+
+| Label | Meaning |
+| --- | --- |
+| <Status value="shipped" /> | In the current release (v1.2) and covered by tests. |
+| <Status value="beta" /> | Available, but the API may change before 2.0. Feedback welcome. |
+| <Status value="planned" /> | Not implemented yet. Code on that page shows the intended design, not something you can import today. |
+
+## Core
+
+| Feature | Status | Package / command |
+| --- | --- | --- |
+| Importable library (`app.New`, `app.Main`) | <Status value="beta" /> | `github.com/mithril-framework/mithril/app` |
+| `mithril new` thin project template | <Status value="beta" /> | `mithril new` |
+| Typed configuration from env / `.env` | <Status value="shipped" /> | `config` |
+| Fiber v3 HTTP stack (request ID, recover, logger, CORS) | <Status value="shipped" /> | `app` |
+| Security headers (Helmet), on by default | <Status value="shipped" /> | `ENABLE_HELMET` |
+| Gzip / Brotli compression | <Status value="shipped" /> | `ENABLE_COMPRESSION` |
+| Management commands (`go run . migrate`, `routes`, `openapi`, …) | <Status value="beta" /> | `app.Main` |
+| Single self-contained binary (`embed.FS` migrations, views, assets) | <Status value="beta" /> | `app.WithMigrations`, `WithViews`, `WithStatic` |
+| Jet templates | <Status value="shipped" /> | `app.WithViews` |
+| Laravel-style DI container | <Status value="planned" /> | — |
+| CSRF protection, sessions | <Status value="planned" /> | — |
+| Rate limiting | <Status value="planned" /> | — |
+| WebSockets, gRPC | <Status value="planned" /> | — |
+| Background jobs / queues | <Status value="planned" /> | — |
+| i18n | <Status value="planned" /> | — |
+
+## Data
+
+| Feature | Status | Package / command |
+| --- | --- | --- |
+| PostgreSQL via pgx v5 | <Status value="shipped" /> | `db` |
+| Declarative resources (CRUD + OpenAPI + permissions + admin) | <Status value="beta" /> | `resource.Define[T]` |
+| Embedded goose migrations (core + app) | <Status value="beta" /> | `migrate`, `go run . migrate up` |
+| Resource generator | <Status value="beta" /> | `mithril make:resource` |
+| `migrate-gen` (diff models against the schema) | <Status value="planned" /> | — |
+| Backup / restore | <Status value="shipped" /> | `make backup` (framework repo) |
+| Embedded DBMS web UI | <Status value="shipped" /> | `go run . dbms` (localhost only) |
+| Seeders | <Status value="shipped" /> | `make seed` (framework repo) |
+
+## API
+
+| Feature | Status | Package / command |
+| --- | --- | --- |
+| Typed handlers with binding + validation | <Status value="beta" /> | `api.Get/Post/...` |
+| OpenAPI 3.1 generated from Go types | <Status value="beta" /> | `openapi`, `/openapi.json`, `go run . openapi` |
+| Swagger UI | <Status value="shipped" /> | `/docs` (`ENABLE_DOCS`) |
+| AI-generated Swagger (`make swagger`) | Removed in 1.2 | replaced by the deterministic generator |
+
+## Security
+
+| Feature | Status | Package / command |
+| --- | --- | --- |
+| JWT access + refresh tokens (HS256, type-checked) | <Status value="shipped" /> | `auth` |
+| Register / login / refresh / me / logout | <Status value="shipped" /> | `/auth/*` |
+| Django-style RBAC (roles, permissions, superusers) | <Status value="shipped" /> | `acl`, `go run . acl` |
+| Ownership-aware permissions (`change` vs `change_any`) | <Status value="shipped" /> | `resource` |
+| Token revocation / server-side sessions | <Status value="planned" /> | — |
+| Password reset, email verification, OTP, 2FA | <Status value="planned" /> | endpoints return 501 |
+| OAuth / social login, API keys | <Status value="planned" /> | — |
+
+## Admin, tooling and operations
+
+| Feature | Status | Package / command |
+| --- | --- | --- |
+| Admin panel (users, roles, permissions) | <Status value="shipped" /> | `/admin` (`ENABLE_ADMIN_PANEL`) |
+| Admin pages for every registered resource | <Status value="beta" /> | `/admin/r/<name>` |
+| MCP server for AI coding agents | <Status value="beta" /> | `go run . mcp` |
+| `AGENTS.md` + `.mcp.json` in new projects | <Status value="beta" /> | `mithril new` |
+| `/health`, `/livez`, `/readyz` | <Status value="shipped" /> | `app` |
+| `/monitor` dashboard (superusers only) | <Status value="shipped" /> | `ENABLE_MONITOR` |
+| Prometheus `/metrics`, OpenTelemetry, Sentry | <Status value="planned" /> | — |
+| Docker image, Kubernetes manifests, GitHub Actions | <Status value="shipped" /> | framework repo |
+| Testing helpers (`mithriltest`) | <Status value="planned" /> | — |
+
+See the [ROADMAP](https://github.com/mithril-framework/mithril/blob/main/ROADMAP.md) for the order planned features are expected to land.

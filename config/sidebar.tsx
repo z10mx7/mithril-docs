@@ -1,4 +1,15 @@
-import { Component, Database, Shield, Code, Server, Container, Activity, FileText, Users, Wrench } from 'lucide-react';
+import {
+  Component,
+  Database,
+  Shield,
+  Code,
+  Server,
+  Container,
+  Activity,
+  Users,
+  Wrench,
+  Bot,
+} from 'lucide-react';
 
 export const sidebarNav = [
   {
@@ -18,6 +29,10 @@ export const sidebarNav = [
         title: 'Quick Start',
         href: '/docs/getting-started/quick-start',
       },
+      {
+        title: 'Feature Status',
+        href: '/docs/getting-started/feature-status',
+      },
     ],
   },
   {
@@ -28,6 +43,10 @@ export const sidebarNav = [
       {
         title: 'Application Structure',
         href: '/docs/core/application',
+      },
+      {
+        title: 'Resources',
+        href: '/docs/core/resources',
       },
       {
         title: 'Configuration',
@@ -68,7 +87,7 @@ export const sidebarNav = [
     defaultOpen: false,
     pages: [
       {
-        title: 'Models & Relationships',
+        title: 'Models',
         href: '/docs/database/models',
       },
       {
@@ -102,12 +121,23 @@ export const sidebarNav = [
     defaultOpen: false,
     pages: [
       {
-        title: 'Request Validation',
+        title: 'Typed Handlers & Validation',
         href: '/docs/api/validation',
       },
       {
-        title: 'Swagger Documentation',
+        title: 'OpenAPI & Swagger UI',
         href: '/docs/api/swagger',
+      },
+    ],
+  },
+  {
+    title: 'AI Tooling',
+    icon: <Bot className="h-5 w-5" />,
+    defaultOpen: false,
+    pages: [
+      {
+        title: 'AI Agents & MCP',
+        href: '/docs/ai/agents',
       },
     ],
   },
@@ -132,7 +162,7 @@ export const sidebarNav = [
     defaultOpen: false,
     pages: [
       {
-        title: 'Docker',
+        title: 'Docker & Single Binary',
         href: '/docs/deployment/docker',
       },
       {

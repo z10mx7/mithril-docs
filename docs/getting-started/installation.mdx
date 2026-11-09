@@ -1,202 +1,76 @@
 ---
 title: 'Installation'
-description: 'Install Mithril framework and get started'
+description: 'Install the Mithril CLI and create a project'
 ---
 
 # Installation
 
-This guide installs the Mithril CLI and sets up a new project.
+<PageStatus value="shipped" />
 
 ## Prerequisites
 
-- **Go 1.25+** — [Download Go](https://go.dev/dl/)
-- **Git** — [Download Git](https://git-scm.com/downloads)
-- **Make** — GNU Make (pre-installed on macOS/Linux)
-- **Docker** (optional) — for local Postgres and dev services
+- **Go 1.26+**: [download Go](https://go.dev/dl/)
+- **PostgreSQL 14+**: Docker is the easiest way (`docker compose up -d postgres` in a new project)
+- **Git** (optional; `mithril new` initializes a repository when it's available)
 
 ## Install the CLI
 
-### Method 1: Install script (recommended)
+```bash
+go install github.com/mithril-framework/mithril/cmd/mithril@latest
+mithril --version   # mithril 1.2.0 (github.com/mithril-framework/mithril)
+```
+
+Make sure `$(go env GOPATH)/bin` is on your `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"   # add to ~/.zshrc or ~/.bashrc
+```
+
+The install script does the same and checks for older CLIs that shadow it:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mithril-framework/mithril/main/install.sh | sh
 ```
 
-This runs `GOPROXY=direct go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2` and verifies the installed binary. The install script bypasses stale `proxy.golang.org` cache (which may still serve v0.1.0 as `@latest`).
-
-If an old scaffold CLI is on `/usr/local/bin`, the script **exits with an error** until you run `sudo $(go env GOPATH)/bin/mithril init` or fix PATH — this prevents silently using the wrong binary in a new terminal.
-
-**After install**, add Go bin to your PATH (required if another `mithril` exists on the system):
+## Create a project
 
 ```bash
-export PATH="$(go env GOPATH)/bin:$PATH"
-mithril --version   # expect: mithril 1.0.2 (github.com/mithril-framework/mithril)
+mithril new -module github.com/you/shop shop
+cd shop
+docker compose up -d postgres
+mithril migrate up
+mithril serve
 ```
 
-Put that `export` in `~/.zshrc` or `~/.bashrc`. If `mithril --version` prints `dev`, run `sudo $(go env GOPATH)/bin/mithril init` or fix PATH order.
+`mithril new` writes a small project from the template built into the CLI; it no longer clones the framework repository. The project's `go.mod` requires `github.com/mithril-framework/mithril`, so framework updates are a `go get -u` away. Without `-module`, the module path defaults to `github.com/<your GitHub user>/<name>` when `gh` or `git config github.user` knows your username, else to the folder name.
 
-### Method 2: go install
+See the [Quick Start](/docs/getting-started/quick-start) for the full first-run walkthrough.
 
-```bash
-go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2
-mithril --version
-```
-
-### Method 3: From source
+## Working on the framework itself
 
 ```bash
 git clone https://github.com/mithril-framework/mithril.git
 cd mithril
-go build -o bin/mithril ./cmd/mithril
-sudo ln -sf "$(pwd)/bin/mithril" /usr/local/bin/mithril
-mithril --version
-```
-
-## Create a Project
-
-```bash
-mithril new hello-mithril
-cd hello-mithril
-mithril install
-```
-
-`mithril new` clones the framework, removes dev cruft (stray binaries), rewrites the Go module (defaults to `github.com/your-user/project-name` when `gh` or `git config github.user` is set), copies `env.example` → `.env`, runs `go mod tidy`, and initializes a **fresh git repository** on the `main` branch.
-
-Override the module path:
-
-```bash
-mithril new -module github.com/acme/api my-api
-```
-
-## Start Developing
-
-```bash
-# Start PostgreSQL (Docker) — trust auth, database mithril_rev
-make dc-up-postgres
-
-# Run migrations
-mithril migrate-up
-
-# Create a login user (pick one)
-mithril seed              # user@example.com / password
-# mithril createsuperuser
-# mithril createsuperuser --email admin@example.com --password 'your-password'
-
-# Run server (port 4000)
-mithril run
-```
-
-If Postgres is down, the dev server still starts with limited routes (warning in logs). Use `APP_ENV=production` to require DB.
-
-Visit:
-
-- App: http://localhost:4000
-- Swagger: http://localhost:4000/docs
-- Health: http://localhost:4000/health
-
-## Clone the Framework Repo
-
-To contribute or run the framework itself:
-
-```bash
-git clone https://github.com/mithril-framework/mithril.git
-cd mithril
-make install
 cp env.example .env
 make dc-up-postgres
 make migrate-up
 make run
 ```
 
-Inside a project, `mithril <target>` delegates to `make` (same as `./mithril` shell script).
-
-## Environment Variables
-
-Copy `env.example` to `.env`:
+The repository root is a reference app (with a `blogs` example resource) built on the library. To try your framework changes in a separate project, point it at your checkout:
 
 ```bash
-cp env.example .env
-```
-
-Key variables:
-
-| Variable | Description |
-|----------|-------------|
-| `PORT` | HTTP port (default `4000`) |
-| `JWT_SECRET` | **Required** when `APP_ENV=production` |
-| `DATABASE_URL` | PostgreSQL connection string (overrides `DB_*`) |
-| `DB_HOST` | Set for PostgreSQL; comment out to run without DB |
-| `DB_NAME` | Default `mithril_rev` (matches docker-compose) |
-| `ENABLE_REGISTER` | Set `true` to allow `POST /auth/register` |
-| `ENABLE_COMPRESSION` | Enable gzip responses |
-| `ENABLE_HELMET` | Security headers |
-| `CORS_ORIGINS` | Comma-separated allowed origins |
-
-## Project Structure
-
-```
-mithril/
-├── main.go                 # Entry point
-├── routes/                 # Route registration
-├── internal/               # Auth, ACL, admin, CRUD
-├── database/
-│   ├── models/
-│   ├── repositories/
-│   └── migrations/         # goose SQL
-├── cmd/                    # CLI tools
-├── pkg/utils/              # Shared utilities
-├── public/admin/           # Admin SPA
-├── infrastructure/         # Docker, K8s, compose
-├── Makefile
-└── mithril                 # make wrapper script
+mithril new -local ../mithril demo     # adds a replace directive to go.mod
 ```
 
 ## Troubleshooting
 
-**`mithril: command not found`**
+**`mithril: command not found`**: add `$(go env GOPATH)/bin` to `PATH` (see above).
 
-Add Go bin to PATH:
+**`go mod tidy failed` during `mithril new`**: the requested framework version isn't reachable yet (for example, offline). Run `go mod tidy` inside the project later, or use `-local` with a checkout.
 
-```bash
-export PATH="$(go env GOPATH)/bin:$PATH"
-```
+**`JWT_SECRET is required`**: `APP_ENV` is unset or set to production, which require a strong secret. Set `APP_ENV=development` for local work, or generate one with `openssl rand -base64 32`.
 
-**Database connection failed**
+**`database unavailable` / 503 on `/api`**: in development the app starts without a database and keeps retrying. Check `DATABASE_URL` / `DB_*` and `docker compose ps`.
 
-Ensure Postgres is running and `.env` matches docker-compose:
-
-```bash
-make dc-up-postgres
-# Defaults: user postgres, database mithril_rev, trust auth (no password)
-```
-
-**Postgres container won't stay running**
-
-On a fresh Docker volume, Postgres 16 needs `POSTGRES_HOST_AUTH_METHOD=trust` or a non-empty password. Reset:
-
-```bash
-docker volume rm mithril_postgres_data
-make dc-up-postgres
-```
-
-**Run without a database**
-
-Comment out `DB_HOST` in `.env` to preview `/`, `/health`, and `/docs` while debugging Postgres.
-
-**Go version mismatch**
-
-Mithril requires Go 1.25+. Check with `go version`.
-
-**`mithril --version` shows `dev` or scaffold output**
-
-Ensure the framework CLI from `go install github.com/mithril-framework/mithril/cmd/mithril@v1.0.2` is first on PATH. See [Quick Start troubleshooting](/docs/getting-started/quick-start#troubleshooting).
-
-**`migrate-up` says "no migrations to run" on a new project**
-
-You may be reusing a local Docker volume from an earlier Mithril project (`mithril_postgres_data`). That is normal — the database is already migrated. Run `mithril migrate-status` to confirm. For a completely fresh DB: `docker volume rm mithril_postgres_data && make dc-up-postgres`.
-
-## Next Steps
-
-- [Quick Start](/docs/getting-started/quick-start)
-- [Migrations](/docs/database/migrations)
-- [Docker deployment](/docs/deployment/docker)
+**Projects created before 1.2**: they keep working; `mithril <target>` still runs their `make` targets. To migrate one to the library layout, create a new project and move your models and migrations over (see [Migrations](/docs/database/migrations#upgrading-a-pre-12-project)).
