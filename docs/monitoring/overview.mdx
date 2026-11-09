@@ -5,9 +5,10 @@ description: "Comprehensive monitoring, metrics, and observability features"
 
 # Monitoring & Observability
 
-<PlannedFeatureBanner>
-Prometheus, OpenTelemetry, and Sentry integrations are planned. Today Mithril ships `/health`, `/livez`, `/readyz`, and `/monitor` only.
-</PlannedFeatureBanner>
+<PageStatus value="planned">
+**Shipped today:** `/health`, `/livez`, `/readyz` and the `/monitor` dashboard (`ENABLE_MONITOR=true`, superusers only), plus request-ID-tagged logs.
+**Planned:** everything else on this page: Prometheus `/metrics`, OpenTelemetry tracing, Sentry and structured logging levels.
+</PageStatus>
 
 Mithril provides health and system monitoring endpoints. Advanced observability is on the roadmap.
 

@@ -1,0 +1,148 @@
+---
+title: 'Resources'
+description: 'One struct, one call: CRUD API, OpenAPI, permissions and an admin page'
+---
+
+# Resources
+
+<PageStatus value="beta">
+Available since v1.2. Field options and hooks may still grow before 2.0.
+</PageStatus>
+
+A **resource** turns a Go struct into a complete REST resource with a single registration call. Mithril generates:
+
+- `GET /api/<name>` (paginated list), `POST /api/<name>`, and `GET`/`PATCH`/`PUT`/`DELETE /api/<name>/:id`
+- request validation from `validate` tags (422 responses with per-field errors)
+- OpenAPI 3.1 operations and schemas (`/openapi.json`, Swagger UI at `/docs`)
+- permission codenames, created in the database at startup
+- an admin panel page at `/admin/r/<name>`
+
+## Define a resource
+
+```go
+// models/post.go
+package models
+
+import (
+    "time"
+
+    "github.com/google/uuid"
+)
+
+type Post struct {
+    ID          uuid.UUID  `json:"id"`
+    Title       string     `json:"title" validate:"required,max=200"`
+    Body        string     `json:"body" mithril:"text"`
+    Published   bool       `json:"published"`
+    PublishedAt *time.Time `json:"published_at"`
+    OwnerID     uuid.UUID  `json:"owner_id" mithril:"owner"`
+    CreatedAt   time.Time  `json:"created_at"`
+    UpdatedAt   time.Time  `json:"updated_at"`
+}
+```
+
+```go
+// resources.go
+func resources() []resource.Resource {
+    return []resource.Resource{
+        resource.Define[models.Post](resource.Options{Name: "posts"}),
+        // mithril:resources
+    }
+}
+```
+
+You still own the table: add a migration (the generator below writes one for you).
+
+## Generate one
+
+```bash
+mithril make:resource Post title:string:required body:text published:bool published_at:time --owner
+go run . migrate up
+```
+
+This writes `models/post.go` and `migrations/<timestamp>_create_posts.sql`, then adds the registration line before the `// mithril:resources` marker in `resources.go`. Pass `--dry-run` to print the files without writing them.
+
+Supported field types: `string` `text` `email` `url` `int` `float` `bool` `time` `uuid` `json`. Add `:required` to require a field on create.
+
+## Struct tags
+
+| Tag | Effect |
+| --- | --- |
+| `json:"name"` | API field name. `json:"-"` hides the field from the API (it can't be read or written). |
+| `db:"column"` | Column name (default: the field name in snake_case). `db:"-"` means "not persisted". |
+| `validate:"required,min=3,max=200,email,url,uuid,oneof=a b"` | Validation on create (all fields) and update (only fields that were sent). |
+| `mithril:"pk"` | Primary key (default: the field whose column is `id`; `uuid.UUID` or an integer). |
+| `mithril:"owner"` | The row belongs to the user who created it (`uuid.UUID`). Set from the access token, never from the request. |
+| `mithril:"readonly"` | Server-managed: clients can't set it. |
+| `mithril:"text"` | Long text (textarea in the admin panel). |
+| `doc:"..."`, `example:"..."` | Description and example in the OpenAPI schema. |
+
+`id`, `created_at`, `updated_at` and the owner field are always read-only. Clients that send them are ignored, not trusted, so mass assignment isn't possible. `updated_at` is set to `NOW()` on every update.
+
+## Options
+
+```go
+resource.Options{
+    Name:       "posts",     // URL segment and permission prefix (required)
+    Table:      "blog_posts", // default: Name
+    Label:      "Posts",     // admin panel label
+    OwnerField: "AuthorID",  // alternative to the mithril:"owner" tag
+    OrderBy:    "published_at", // default: created_at, newest first
+    MaxLimit:   100,         // maximum page size
+}
+```
+
+## Permissions
+
+Superusers bypass every check. Everyone else needs these codenames (granted through roles or directly):
+
+| Codename | Without an owner field | With an owner field |
+| --- | --- | --- |
+| `posts.view` | list and read | list and read **all** rows (without it, users see only their own) |
+| `posts.add` | create | create (the creator becomes the owner) |
+| `posts.change` | update | update **own** rows |
+| `posts.change_any` | — | update any row |
+| `posts.delete` | delete | delete **own** rows |
+| `posts.delete_any` | — | delete any row |
+
+Rows you can't see return **404** (not 403), so IDs can't be probed.
+
+```bash
+go run . acl role create editor
+go run . acl assign permission role editor posts.change_any
+go run . acl assign role ada@example.com editor
+```
+
+## The API it generates
+
+```bash
+TOKEN=... # access_token from POST /auth/login
+
+curl -s localhost:4000/api/posts -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"title":"Hello","body":"First post"}'
+
+curl -s 'localhost:4000/api/posts?limit=20&offset=0' -H "Authorization: Bearer $TOKEN"
+# {"items":[...],"total":1,"limit":20,"offset":0}
+
+curl -s -X PATCH localhost:4000/api/posts/<id> -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"published":true}'   # only sent fields change
+```
+
+Errors share one shape:
+
+```json
+{ "error": "validation_error", "message": "validation failed",
+  "fields": [{ "field": "title", "rule": "required", "message": "title is required" }] }
+```
+
+Database constraint violations map to client errors: unique → 409, foreign key → 400, not null → 422. Anything unexpected becomes a generic 500 with a `request_id`; details go to the server log only.
+
+## Custom endpoints
+
+For logic that isn't CRUD, use [typed handlers](/docs/api/validation) next to your resources. They are validated and documented the same way.
+
+<Note type="warning">
+Fiber matches routes in registration order, and resources are registered before `routes(a)` in the template. A custom
+`GET /api/posts/featured` would therefore be captured by the resource's `GET /api/posts/:id` route. Put custom endpoints
+under their own prefix (`/api/feeds/featured-posts`) or register them before the resource.
+</Note>

@@ -1,0 +1,65 @@
+---
+title: 'AI Agents & MCP'
+description: 'MCP server, AGENTS.md and deterministic generators for AI coding agents'
+---
+
+# AI Agents & MCP
+
+<PageStatus value="beta">
+Shipped in v1.2. Tool names are stable; more tools (e.g. running tests, reading logs) are planned.
+</PageStatus>
+
+Mithril is built so AI coding agents (Claude Code, Cursor, Copilot, Codex, …) can work on your app from **facts, not guesses**:
+
+1. **`go run . mcp`**: an [MCP](https://modelcontextprotocol.io) server that runs inside *your* app and reports its real routes, resources, OpenAPI document and migrations.
+2. **`AGENTS.md`**: project conventions every new project ships with.
+3. **Deterministic generators**: `mithril make:resource` (and the `scaffold_resource` tool) write code in one predictable shape, so agents don't have to invent boilerplate.
+
+## Connect an agent
+
+`mithril new` creates `.mcp.json`, which MCP-aware clients pick up automatically:
+
+```json
+{
+  "mcpServers": {
+    "shop": { "command": "go", "args": ["run", ".", "mcp"] }
+  }
+}
+```
+
+With Claude Code you can also run `claude mcp add shop -- go run . mcp`. The server speaks MCP over stdio and logs only to stderr.
+
+## Tools
+
+| Tool | Reads | Description |
+| --- | --- | --- |
+| `app_info` | config | App name, environment and feature flags. Secrets are never included. |
+| `list_routes` | router | Every HTTP method and path. |
+| `list_resources` | registry | Each resource's fields (kind, read-only, required), owner, permissions and API path. |
+| `get_openapi` | types | The full OpenAPI 3.1 document. |
+| `list_migrations` | binary | Embedded core and app migration files. |
+| `migration_status` | database | Applied and pending migrations (connects to the configured DB). |
+| `scaffold_resource` | writes files | Generates a model, a migration and the `resources.go` registration. Supports `dry_run`. |
+
+`scaffold_resource` is the only tool that writes. It creates files in the working directory and refuses to overwrite an existing model. MCP clients ask you before running tools; ask the agent to use `dry_run` first.
+
+## AGENTS.md
+
+New projects include an `AGENTS.md` that tells agents to:
+
+- inspect the app with `go run . routes`, `resources` and `openapi` instead of guessing;
+- add CRUD through `make:resource` / `scaffold_resource`, then `go run . migrate up`;
+- write custom endpoints as [typed handlers](/docs/api/validation) so they are validated and documented;
+- never bypass resource permissions or put secrets in code;
+- finish with `go test ./...` passing.
+
+Edit it freely: it's your project's guide, and tools such as Claude Code and Cursor read it automatically.
+
+## Generators
+
+```bash
+mithril make:resource Order total:float:required status:string notes:text --owner --dry-run
+mithril make:resource Order total:float:required status:string notes:text --owner
+```
+
+The output is the same every time for the same input. It's `gofmt`-ed, compiles, and is covered by the framework's tests, so it's reliable for both humans and agents.

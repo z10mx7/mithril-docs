@@ -5,9 +5,9 @@ description: "Comprehensive testing utilities and infrastructure for Mithril app
 
 # Testing Infrastructure
 
-<PlannedFeatureBanner>
-The `pkg/testing` helpers described below are planned. Use standard `go test`, `fiber.Test()`, and httptest as shown in the framework's `internal/auth/handlers_test.go` and `routes/core_test.go`.
-</PlannedFeatureBanner>
+<PageStatus value="planned">
+The `mithriltest` helpers described here are planned. Today, use `app.New(app.WithoutDatabase(), app.WithConfig(...))` with `a.Fiber.Test(req)`, as in the generated `main_test.go`. The framework itself runs `go test ./...` in CI.
+</PageStatus>
 
 Mithril uses Go's built-in testing package. Run tests with:
 

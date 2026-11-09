@@ -5,6 +5,11 @@ description: "Comprehensive health check system for application monitoring"
 
 # Health Checks
 
+<PageStatus value="beta">
+**Shipped:** `GET /health` (status plus database ping, without internal error details), `GET /livez` and `GET /readyz` (also checks the database).
+**Planned:** the configurable health-check registry described in the rest of this page.
+</PageStatus>
+
 Mithril provides a robust health check system that monitors your application's dependencies and overall health status. This is essential for production deployments, load balancers, and monitoring systems.
 
 ## Basic Health Check Endpoints

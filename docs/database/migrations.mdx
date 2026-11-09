@@ -1,79 +1,68 @@
 ---
 title: 'Migrations'
-description: 'Database migrations with goose in Mithril'
+description: 'Embedded goose migrations: core tables plus your own'
 ---
 
 # Migrations
 
-Mithril uses [goose](https://github.com/pressly/goose) for versioned SQL migrations in `database/migrations/`.
+<PageStatus value="beta">
+Embedded migrations and `go run . migrate` shipped in v1.2. Generating migrations from model diffs (`migrate-gen`) is <Status value="planned" />.
+</PageStatus>
 
-## File Naming
+Mithril uses [goose](https://github.com/pressly/goose) SQL migrations, **embedded in your binary**. Deployment needs no migration files and no goose CLI.
 
-```
-database/migrations/
-├── 0001_create_users.sql
-├── 0004_acl.sql
-├── 0005_blogs.sql
-└── ...
-```
+There are two sets, applied in order:
 
-Use sequential prefixes and descriptive names.
+| Set | Lives in | Tracked in | Contents |
+| --- | --- | --- | --- |
+| core | the framework | `mithril_core_migrations` | users, roles, permissions and their join tables |
+| app | your `migrations/` | `goose_db_version` | your tables |
 
-## Migration Format
+## Writing a migration
 
 ```sql
+-- migrations/20260110093000_create_products.sql
 -- +goose Up
-CREATE TABLE blogs (
+CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT NOT NULL DEFAULT '',
-    content TEXT NOT NULL DEFAULT '',
-    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    is_active BOOLEAN NOT NULL DEFAULT true,
+    name TEXT NOT NULL DEFAULT '',
+    price DOUBLE PRECISION NOT NULL DEFAULT 0,
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- +goose Down
-DROP TABLE IF EXISTS blogs;
+DROP TABLE IF EXISTS products;
 ```
 
-## CLI Commands
+File names start with a version number (a timestamp like `mithril make:resource` uses, or `00001`). Out-of-order versions are allowed, so branches merged later still apply.
+
+Embed the directory and pass it to the app:
+
+```go
+//go:embed migrations
+var migrations embed.FS
+
+a := app.Must(app.New(app.WithMigrations(migrations, "migrations")))
+```
+
+## Commands
 
 ```bash
-mithril migrate-up       # Apply pending migrations
-mithril migrate-down     # Roll back one migration
-mithril migrate-status   # Show migration state
-mithril migrate-reset    # Reset database (destructive)
+go run . migrate up       # apply pending core + app migrations, then create resource permissions
+go run . migrate status   # SET  VERSION  STATE  FILE
+go run . migrate down     # roll back the latest app migration
 ```
 
-These map to `make migrate-*` targets and use `DATABASE_URL` from `.env`.
+In production, run `./app migrate up` as a release step (for example, a Kubernetes `Job` or an init container) before rolling out new instances. On startup the server only **warns** about pending migrations; it never applies them by itself.
 
-## Connection
+## Upgrading a pre-1.2 project
 
-Set in `.env`:
+Databases created by the old `database/migrations/0001…0007` files already contain the core tables. The core migration uses `IF NOT EXISTS` throughout, so `migrate up` records it without changing data. Keep your own migrations at their old version numbers; they stay applied in `goose_db_version`.
 
-```bash
-DATABASE_URL=postgres://postgres@localhost:5432/mithril_rev?sslmode=disable
-```
+## Tips
 
-Or individual vars: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
-
-## Local Postgres
-
-```bash
-make dc-up-postgres   # Docker compose service
-mithril migrate-up
-```
-
-Default database name: `mithril_rev`.
-
-## Best Practices
-
-- Never edit applied migrations in production — add a new file instead
-- Always include `-- +goose Down` for rollback
-- Test migrations with `migrate-down` before deploying
-
-## Next Steps
-
-- [Models](/docs/database/models)
-- [Seeders](/docs/database/seeders)
+- One change per migration, always with a working `Down`.
+- Never edit a migration that has run in production. Add a new one instead.
+- Resource structs don't create tables: the migration is the source of truth for the schema.

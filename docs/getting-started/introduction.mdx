@@ -15,78 +15,62 @@ description: 'Welcome to Mithril - A batteries-included web framework for Go'
 
 # Welcome to Mithril
 
-Mithril is a batteries-included, AI-friendly Go web framework built on [Fiber](https://gofiber.io). It draws inspiration from Django, Laravel, FastAPI, Express, and NestJS — bringing a modern developer experience to the Go ecosystem.
+Mithril is a batteries-included, AI-friendly Go web framework built on [Fiber](https://gofiber.io). It brings the productivity of Django and Laravel (admin panel, RBAC, migrations, generators) and FastAPI's typed, self-documenting endpoints to Go, as a library you import.
 
-## Available Now
+```go
+type Post struct {
+    ID        uuid.UUID `json:"id"`
+    Title     string    `json:"title" validate:"required,max=200"`
+    Body      string    `json:"body" mithril:"text"`
+    AuthorID  uuid.UUID `json:"author_id" mithril:"owner"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+}
 
-### Developer Experience
+func main() {
+    a := app.Must(app.New(app.WithMigrations(migrations, "migrations")))
+    a.Register(resource.Define[Post](resource.Options{Name: "posts"}))
+    app.Main(a) // serve, or: migrate up | routes | openapi | createsuperuser | mcp
+}
+```
 
-- **CLI**: Global `mithril new` + project commands via `mithril` / `make` (migrations, CRUD gen, seed, backup)
-- **Code generation**: CRUD from models (`mithril crud MODEL=Blog`)
-- **Hot reload**: Air integration (`mithril run-dev`)
-- **Docker**: Multi-stage Dockerfile with health checks
-- **AI Swagger**: Regenerate OpenAPI via `mithril swagger` (requires `OPENAI_API_KEY`)
-- **Migrations**: goose SQL migrations (`mithril migrate-up`)
-- **Seeders, backup & restore**: `mithril seed`, `mithril backup`, `mithril restore`
-- **Dev services**: Postgres, PgAdmin, Adminer, Redis, RabbitMQ, Kafka via `make dc-up-<service>`
-- **Embedded DBMS**: Lightweight Postgres UI on `:5050` (`mithril dbms`)
-- **Admin panel**: Django-inspired UI at `/admin` (`mithril admin-enable`)
+That's a validated, paginated CRUD API under `/api/posts` with JWT auth, ownership-aware permissions, an OpenAPI 3.1 document, Swagger UI and an admin panel page, all in one self-contained binary.
 
-### Architecture
+Each docs page is labelled <Status value="shipped" />, <Status value="beta" /> or <Status value="planned" />. The [Feature Status](/docs/getting-started/feature-status) page has the full list.
 
-- **Fiber v3** on fasthttp with Sonic JSON
-- **PostgreSQL** via pgx v5
-- **Repository pattern** in `database/repositories/`
-- **Middleware**: CORS, logger, recover, request ID, optional Helmet & gzip
-- **JET templates** for server-rendered HTML
+## Highlights
 
-### Security (shipped)
+| | Status |
+| --- | --- |
+| [Declarative resources](/docs/core/resources): CRUD, validation, permissions, OpenAPI and admin from one struct | <Status value="beta" /> |
+| [Typed handlers](/docs/api/validation) with binding and validation | <Status value="beta" /> |
+| [OpenAPI 3.1 from Go types](/docs/api/swagger): deterministic, offline, never stale | <Status value="beta" /> |
+| [JWT auth](/docs/authentication/jwt) and Django-style [RBAC](/docs/authentication/rbac) | <Status value="shipped" /> |
+| Admin panel | <Status value="shipped" /> |
+| [Embedded migrations and a single-binary deploy](/docs/deployment/docker) | <Status value="beta" /> |
+| [MCP server, AGENTS.md and generators for AI agents](/docs/ai/agents) | <Status value="beta" /> |
+| Secure defaults: fail-closed secrets, security headers, no internal errors leaked | <Status value="shipped" /> |
+| CSRF, rate limiting, sessions, 2FA, password reset | <Status value="planned" /> |
+| WebSockets, gRPC, queues, object storage, OpenTelemetry, Prometheus | <Status value="planned" /> |
 
-- **JWT** access + refresh tokens
-- **RBAC**: Django-style roles and permissions with ACL CLI
-- **Ownership helpers** for resource-level access (e.g. blog posts)
-- **Security headers** via optional Helmet middleware
-- **Request ID** on every request
+## How it compares
 
-### Production
-
-- **Health**: `/health`, Fiber healthcheck (`/livez`, `/readyz`)
-- **Monitor**: `/monitor` (Fiber system dashboard)
-- **Kubernetes** manifests in `infrastructure/k8s/`
-- **GitHub Actions** CI/CD pipeline
-- **Gzip** when `ENABLE_COMPRESSION=true`
-
-## Planned (see [ROADMAP](https://github.com/mithril-framework/mithril/blob/main/ROADMAP.md))
-
-- CSRF, rate limiting, sessions, captcha
-- 2FA, email verification, password reset (auth stubs return 501 today)
-- WebSockets, gRPC, background queues
-- S3/MinIO object storage
-- OpenTelemetry, Sentry, Prometheus `/metrics`
-- FastAPI-style request validation layer
-- Laravel-style DI service container
-- `migrate-gen` from models
-
-## Quick Comparison
-
-| Feature             | Mithril           | Gin       | Echo      | Fiber        |
-| ------------------- | ----------------- | --------- | --------- | ------------ |
-| **Performance**     | Very High         | High      | High      | Very High    |
-| **CLI Tools**       | Built-in          | None      | None      | None         |
-| **Code Generation** | Yes               | No        | No        | No           |
-| **Migrations**      | Built-in (goose)  | Manual    | Manual    | Manual       |
-| **Admin Panel**     | Built-in          | No        | No        | No           |
-| **JWT + RBAC**      | Built-in          | Manual    | Manual    | Manual       |
-| **Auto Swagger**    | Yes (AI-assisted) | Manual    | Manual    | Manual       |
+| | Mithril | Gin / Echo / Fiber |
+| --- | --- | --- |
+| HTTP engine | Fiber v3 (fasthttp) | — |
+| CRUD from a struct | Yes | Manual |
+| OpenAPI | Generated from types | Annotations / manual |
+| Auth + RBAC + admin | Built in | Manual |
+| Migrations | Embedded goose | Manual |
+| AI agent tooling (MCP) | Built in | — |
 
 ## What's Next?
 
-1. **[Install Mithril](/docs/getting-started/installation)** — install the CLI
-2. **[Quick Start](/docs/getting-started/quick-start)** — create your first project
-3. **[Application Structure](/docs/core/application)** — learn the layout
-4. **[CLI Commands](/docs/cli/overview)** — explore Makefile / `mithril` commands
-5. **[JWT Authentication](/docs/authentication/jwt)** — auth flow
-6. **[RBAC](/docs/authentication/rbac)** — roles and permissions
+1. **[Quick Start](/docs/getting-started/quick-start)**: build a CRUD API in five minutes
+2. **[Resources](/docs/core/resources)**: the core idea
+3. **[Application Structure](/docs/core/application)**: how a project fits together
+4. **[CLI Commands](/docs/cli/overview)**: `mithril` and your app's commands
+5. **[RBAC](/docs/authentication/rbac)**: roles and permissions
 
 ## Community & Support
 

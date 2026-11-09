@@ -5,6 +5,8 @@ description: 'Role-based access control in Mithril'
 
 # RBAC
 
+<PageStatus value="shipped" />
+
 Mithril provides Django-inspired role-based access control (RBAC) in `internal/acl/`.
 
 ## Concepts
@@ -16,54 +18,45 @@ Mithril provides Django-inspired role-based access control (RBAC) in `internal/a
 
 ## Middleware
 
+[Resources](/docs/core/resources) check their own `<name>.*` permissions automatically. For custom routes:
+
 ```go
-api.Use(jwtware.New(jwtConfig))
-api.Use(acl.JWTClaimsMiddleware())
-api.Get("/users", acl.RequirePermission(aclSvc, "users.view"), h.List)
+api.Get(a.API, "/reports", listReports, api.Op{}, a.RequirePermission("reports.view"))
+a.Fiber.Post("/api/maintenance", a.RequireSuperuser(), runMaintenance)
 ```
 
-Other helpers: `RequireRole`, `RequireSuperuser`, `RequireAdminAccess`, `RequireAnyPermission`.
+The `acl` package also has `RequireRole`, `RequireAnyPermission`, `RequireAdminAccess` and `RequireSuperuserDB` for use with an `*acl.Service`.
+
+Privilege changes are always checked against the **database**, not the token: only a superuser can grant or remove superuser status, edit or delete a superuser account, or change roles and permissions. Nobody can change their own superuser or active flag.
 
 ## Ownership
 
-Blog handlers use `acl.Service.CanAccessOwnedResource` so authors can edit their own posts without global `blogs.change` permission.
+Resources with an owner field (`mithril:"owner"`) let owners manage their own rows with `<name>.change` / `<name>.delete`, while `<name>.change_any` / `<name>.delete_any` cover everyone's rows and `<name>.view` lets users read all rows. See [Resources → Permissions](/docs/core/resources#permissions).
 
 ## ACL CLI
 
 ```bash
-# Roles
-mithril acl-role-create NAME=editor
-mithril acl-role-delete NAME=editor
-
-# Permissions
-mithril acl-permission-create NAME=blogs.view
-mithril acl-permission-delete NAME=blogs.view
-
-# Assign role to user (by email)
-mithril acl-assign-role EMAIL=user@example.com ROLE=editor
-mithril acl-revoke-role EMAIL=user@example.com ROLE=editor
-
-# Assign permission to role
-mithril acl-assign-permission-role ROLE=editor PERMISSION=blogs.view
-
-# Superuser
-mithril acl-superuser-set EMAIL=admin@example.com
-mithril acl-superuser-unset EMAIL=admin@example.com
+mithril acl role create editor "Can edit content"
+mithril acl permission create reports.view
+mithril acl assign permission role editor blogs.change_any
+mithril acl assign role ada@example.com editor
+mithril acl assign permission user ada@example.com reports.view
+mithril acl revoke role ada@example.com editor
+mithril acl superuser set admin@example.com
+mithril acl list roles
 ```
 
-Run `make acl` or `mithril acl` for the full command list.
+(`mithril acl` runs `go run . acl` in your project.)
 
 ## Admin Panel Access
 
-`/admin` requires `admin.access` permission or superuser status. Enable the panel:
+`/admin` requires the `admin.access` permission or superuser status. Enable it with `ENABLE_ADMIN_PANEL=true` (on by default in new projects' `.env`).
 
-```bash
-mithril admin-enable
-```
+`admin.access` alone lets staff browse users, roles and permissions. Resource pages also require that resource's permissions (`blogs.view`, `blogs.change_any`, …), and every ACL change requires a superuser.
 
 ## Database Tables
 
-ACL schema is created by goose migrations (`0004_acl.sql`, repairs in later files). Models in `database/models/acl.go`.
+The ACL tables are created by Mithril's embedded core migration (`go run . migrate up`). Models are in `database/models`.
 
 ## Next Steps
 

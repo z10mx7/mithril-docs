@@ -1,71 +1,67 @@
 ---
-title: 'Docker'
-description: 'Deploy Mithril with Docker'
+title: 'Docker & Single Binary'
+description: 'Ship one self-contained binary or a tiny container image'
 ---
 
-# Docker Deployment
+# Docker & Single Binary
 
-Mithril ships a multi-stage Alpine Dockerfile and docker-compose services for development.
+<PageStatus value="beta">
+Single-binary builds (embedded migrations, views, assets and admin UI) shipped in v1.2.
+</PageStatus>
 
-## Build Image
-
-```bash
-make docker-build
-# or: docker build -t mithril:latest .
-```
-
-## Run Container
+A Mithril binary contains everything it needs: the core and app migrations, the admin panel UI, and any views and static files you pass with `app.WithViews` / `app.WithStatic`. Copy the binary anywhere and run it.
 
 ```bash
-make run-docker
-# Maps host :4000 -> container :4000
+CGO_ENABLED=0 go build -trimpath -o bin/shop .
+scp bin/shop server:/srv/shop/
+ssh server 'cd /srv/shop && ./shop migrate up && ./shop serve'
 ```
 
-Pass environment at runtime:
+## Container image
+
+Projects created with `mithril new` include this Dockerfile:
+
+```dockerfile
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/app .
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/app /app
+ENV APP_ENV=production PORT=4000
+EXPOSE 4000
+USER nonroot
+ENTRYPOINT ["/app"]
+```
 
 ```bash
-docker run --rm -p 4000:4000 \
-  -e JWT_SECRET=change-me \
-  -e DATABASE_URL=postgres://user:pass@host.docker.internal:5432/mithril_rev?sslmode=disable \
-  mithril:latest
+docker build -t shop .
+docker run --rm --env-file .env shop migrate up      # release step
+docker run --rm -p 4000:4000 --env-file .env shop    # serve
 ```
 
-## Dockerfile Overview
+The image runs as non-root with no shell. Use `/livez` and `/readyz` for orchestrator probes (`/readyz` also checks the database).
 
-1. **Builder stage**: `golang:1.25-alpine`, `go build -o app .`
-2. **Runtime stage**: `alpine`, copies binary + `views/`, `public/`, `docs/swagger.json`
-3. **Healthcheck**: `GET /health`
+## Environment
 
-## Dev Services (Compose)
-
-`infrastructure/docker-compose.services.yml` provides:
-
-| Service | Port | Command |
-|---------|------|---------|
-| postgres | 5432 | `make dc-up-postgres` |
-| pgadmin | 5051 | `make dc-up-pgadmin` |
-| adminer | 8080 | `make dc-up-adminer` |
-| embedded DBMS | 5050 | `mithril dbms` (app command, not compose) |
-| redis | 6379 | `make dc-up-redis` |
-| rabbitmq | 5672 | `make dc-up-rabbitmq` |
-| kafka | 9092 | `make dc-up-kafka` |
+At minimum, set:
 
 ```bash
-make dc-up-postgres
-make dc-logs-postgres
-make dc-stop-postgres
+APP_ENV=production
+JWT_SECRET=<openssl rand -base64 32>
+DATABASE_URL=postgres://user:pass@db:5432/shop?sslmode=require
+CORS_ORIGINS=https://shop.example.com
 ```
 
-Postgres default database: `mithril_rev`.
+See [Configuration](/docs/core/configuration) for everything else.
 
-## Production Notes
+## Local PostgreSQL
 
-- Set `APP_ENV=production` and a strong `JWT_SECRET`
-- Use external managed PostgreSQL
-- Mount secrets via orchestrator (K8s secrets, not `.env` in image)
-- Enable `ENABLE_HELMET=true` and `ENABLE_COMPRESSION=true` as needed
+`docker compose up -d postgres` starts the database defined in the project's `docker-compose.yml`, bound to `127.0.0.1:5432`.
 
-## Next Steps
+## Framework repository
 
-- [Kubernetes](/docs/deployment/kubernetes)
-- [Installation](/docs/getting-started/installation)
+The framework repo's own Dockerfile builds the reference app the same way (Alpine runtime with a `wget` health check), and `make docker-build` / `make run-docker` wrap it. Its `infrastructure/docker-compose.services.yml` provides optional dev services (PostgreSQL, pgAdmin, Adminer, Redis, RabbitMQ, Kafka) through `make dc-up-<service>`.
