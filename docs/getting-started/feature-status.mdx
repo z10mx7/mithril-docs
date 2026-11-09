@@ -24,10 +24,12 @@ Every page in these docs carries one of three labels:
 | Security headers (Helmet), on by default | <Status value="shipped" /> | `ENABLE_HELMET` |
 | Gzip / Brotli compression (best speed) | <Status value="shipped" /> | `ENABLE_COMPRESSION` |
 | [Performance defaults](/docs/core/performance) (errors-only logs, one ACL query, CPU-sized pool, timeouts) | <Status value="beta" /> | `app.New` |
-| Graceful shutdown on SIGTERM | <Status value="shipped" /> | `app.Main` |
+| Graceful shutdown on SIGTERM (drains in-flight requests, also under prefork) | <Status value="shipped" /> | `app.Main` |
 | Real client IPs behind a trusted proxy | <Status value="shipped" /> | `TRUST_PROXY`, `PROXY_HEADER` |
 | Private pprof listener, `make bench` / `make profile` | <Status value="beta" /> | `PPROF_ADDR` |
 | Prefork / high-throughput mode (opt-in) | <Status value="beta" /> | `PREFORK`, `HIGH_THROUGHPUT` |
+| [1M req/s guide](/docs/core/performance#reaching-1-million-reqs) for stateless services | <Status value="beta" /> | 500k req/s measured on 4 vCPUs |
+| Prebuilt CLI binaries on every merge to `main` | <Status value="beta" /> | [GitHub releases](https://github.com/mithril-framework/mithril/releases) |
 | Management commands (`go run . migrate`, `routes`, `openapi`, …) | <Status value="beta" /> | `app.Main` |
 | Single self-contained binary (`embed.FS` migrations, views, assets) | <Status value="beta" /> | `app.WithMigrations`, `WithViews`, `WithStatic` |
 | Jet templates | <Status value="shipped" /> | `app.WithViews` |

@@ -47,6 +47,89 @@ For **stateless** services (API gateways, token checks, redirects, cache fronts)
 | `PREFORK=true` | One process per CPU on the same port (`SO_REUSEPORT`). Throughput scales nearly linearly with cores. | **Linux only.** Each process has its own memory, so never use it with in-memory state (rate limits, caches, rooms, WebSocket hubs). The default DB pool drops to 4 per process. |
 | `HIGH_THROUGHPUT=true` | Skips the `Date` and default `Content-Type` headers | Saves well under a microsecond per request; only matters at very high request rates. Set `Content-Type` yourself on non-JSON responses. |
 
+Graceful shutdown works under prefork too: on SIGTERM the master passes the signal to every child, each child finishes its in-flight requests, and the whole group exits.
+
+## Reaching 1 million req/s
+
+A million requests per second is reachable with Mithril, for the right kind of endpoint on the right kind of machine. Here is what that takes, with the numbers measured so far.
+
+### What kind of endpoint
+
+1M req/s is a number for **stateless, trivial handlers**: a health check, a token check, a redirect, a value from a read-only map, a small fixed JSON body. Every microsecond of handler work divides it:
+
+| Per request on one core | Ceiling per core |
+| --- | --- |
+| ~8 µs (framework + kernel only) | ~120k req/s |
+| +10 µs of handler work | ~55k req/s |
+| +1 PostgreSQL round trip | a few thousand req/s, bounded by the database |
+
+A route that hits PostgreSQL won't get near 1M on one server, whatever the framework does: the reference app's DB routes ran at 14–17k req/s, limited by PostgreSQL. For those, scale out (more app instances, read replicas, caching) rather than tune.
+
+### Measured
+
+A stateless Mithril app (`app.New(app.WithoutDatabase())`, the default middleware stack minus `helmet`), measured with the server and `wrk` in the **same container in Docker's Linux VM, sharing 4 vCPUs** (Apple M-series, keep-alive, 10 s per run):
+
+| Configuration | `GET /` (text) | `GET /json` | p99 |
+| --- | --- | --- | --- |
+| Defaults | 425k req/s | 388k req/s | 6–10 ms |
+| `PREFORK=true` | 455k req/s | 500k req/s | 2–5 ms |
+| `PREFORK=true HIGH_THROUGHPUT=true` | **470k req/s** | **501k req/s** | 3–5 ms |
+
+These are floors: the load generator used the same 4 cores as the server. That's about 120k req/s per core, so **1M needs roughly 8–10 cores for the server**, with the load coming from elsewhere, or about 14 cores if the client shares them. That matches the public Fiber benchmark Mithril's tuning follows ("Go Fiber Benchmark Deep-Dive: Breaking 1 Million RPS on Apple Silicon", Max Taylor, May 2026): 1,164,939 req/s on `GET /` with 14 cores, prefork, and the client in the same Linux VM. We haven't run Mithril itself at 1M yet; the numbers above are what we have measured.
+
+### The recipe
+
+1. **A stateless service.** Prefork runs one process per core, and each process has its own memory, so nothing may live in memory: no in-process caches, rate limits, sessions, rooms or WebSocket hubs. Keep shared state in PostgreSQL or Redis, or keep that part of the app as a separate service without prefork.
+
+2. **The settings:**
+
+   ```bash
+   PREFORK=true            # one process per core, SO_REUSEPORT (Linux only)
+   HIGH_THROUGHPUT=true    # no Date / default Content-Type header per response
+   LOG_REQUESTS=errors     # the default; never log every request at this rate
+   ENABLE_COMPRESSION=false
+   APP_ENV=production
+   ```
+
+   For a service only other services call (no browsers), `ENABLE_HELMET=false` saves about ten security headers per response. Keep helmet on for anything a browser loads.
+
+3. **A small handler:**
+
+   ```go
+   func main() {
+   	a := app.Must(app.New(app.WithoutDatabase()))
+   	a.Fiber.Get("/health", func(c fiber.Ctx) error { return c.SendString("ok") })
+   	a.Fiber.Get("/v1/flags", func(c fiber.Ctx) error { return c.JSON(flags) }) // read-only, loaded at startup
+   	app.Main(a)
+   }
+   ```
+
+   No allocations you can avoid, no database, no outbound calls. If the data changes, reload it in each process on a timer, or let the router send the request to a slower, stateful service.
+
+4. **Linux, with enough cores.** `SO_REUSEPORT` spreads connections across the processes only on Linux; on macOS prefork does nothing. Raise the file limit (`ulimit -n 200000`, or `LimitNOFILE=200000` in the systemd unit, or `--ulimit nofile=200000:200000` in Docker) and the accept queue (`sysctl -w net.core.somaxconn=65535`).
+
+5. **No proxy hop on the hot path, or a fast one.** nginx in front costs a second HTTP parse per request and needs its own cores to keep up. At this rate, either expose the service through an L4 load balancer (TCP passthrough), or give nginx as many workers as cores, with `worker_connections 8192`, `worker_rlimit_nofile`, and upstream `keepalive` (all in `deploy/nginx.conf.example`).
+
+6. **Clients that keep connections alive.** At 1M req/s, opening a TCP (or TLS) connection per request costs more than the request. Service-to-service clients should reuse connections; terminate TLS at the edge.
+
+### Measure it yourself
+
+Never measure this on macOS loopback: it stops at 150–170k req/s whatever the server does. Run the server and the load generator inside Linux, in the same container or VM:
+
+```bash
+# Build a Linux binary of your app (use amd64 on Intel hosts)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o srv .
+
+# Server and wrk in one container in the Linux VM; give Docker all the cores you want to test
+docker run --rm --platform linux/arm64 --ulimit nofile=200000:200000 -v "$PWD":/b debian:bookworm-slim sh -c '
+  apt-get update -qq && apt-get install -y -qq wrk curl >/dev/null
+  cd /b && PREFORK=true HIGH_THROUGHPUT=true APP_ENV=production JWT_SECRET=bench-only-not-a-secret-0123456789 PORT=3000 ./srv &
+  until curl -sf http://127.0.0.1:3000/health >/dev/null; do sleep 0.2; done
+  for c in 64 256 512; do wrk -t4 -c$c -d15s --latency http://127.0.0.1:3000/health; done'
+```
+
+Step the concurrency (64, 256, 512) and watch p99 as well as throughput. If the client uses more CPU than the server, you're measuring the client. On real hardware, run the load generator on a separate machine on the same network. Profile with `PPROF_ADDR` (it runs in the master process only, so under prefork profile with `PREFORK=false` on the same cores): at the ceiling, the profile should be almost all network syscalls.
+
 ## Measuring your app
 
 New projects include the tooling:
